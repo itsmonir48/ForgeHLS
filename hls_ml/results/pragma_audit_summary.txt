@@ -1,0 +1,107 @@
+ForgeHLS Pragma Audit Summary
+======================================================================
+Total design records audited: 184,717
+Designs where extracted pragma count == stored 'pragma_number': 163,021 (88.25%)
+Designs with mismatch (e.g. non-HLS pragmas or multi-file headers): 21,696
+
+1. Unique Pragma Directives Discovered (Ranked by Occurrences):
+----------------------------------------------------------------------
+  - ARRAY_PARTITION     :  616,308 total times across 181,417 designs ( 98.21% of designs)
+  - UNROLL              :  568,627 total times across 184,642 designs ( 99.96% of designs)
+  - PIPELINE            :  568,072 total times across 184,642 designs ( 99.96% of designs)
+  - LOOP_TRIPCOUNT      :   46,013 total times across   8,567 designs (  4.64% of designs)
+  - INLINE              :   20,926 total times across   2,115 designs (  1.14% of designs)
+  - INTERFACE           :    8,456 total times across   3,100 designs (  1.68% of designs)
+  - DATAFLOW            :    6,526 total times across   3,217 designs (  1.74% of designs)
+  - STREAM              :    2,600 total times across     190 designs (  0.10% of designs)
+  - BIND_STORAGE        :    2,203 total times across     723 designs (  0.39% of designs)
+  - DATA_PACK           :    1,110 total times across     185 designs (  0.10% of designs)
+  - LOOP_FLATTEN        :    1,077 total times across   1,077 designs (  0.58% of designs)
+  - ARRAY_RESHAPE       :      908 total times across     723 designs (  0.39% of designs)
+  - PERFORMANCE         :      870 total times across     145 designs (  0.08% of designs)
+  - DEPENDENCE          :      555 total times across     185 designs (  0.10% of designs)
+  - DISAGGREGATE        :      266 total times across     133 designs (  0.07% of designs)
+  - LATENCY             :      236 total times across     236 designs (  0.13% of designs)
+  - BIND_OP             :      185 total times across     185 designs (  0.10% of designs)
+  - AGGREGATE           :       73 total times across      73 designs (  0.04% of designs)
+  - STABLE              :        7 total times across       6 designs (  0.00% of designs)
+  - ALIAS               :        1 total times across       1 designs (  0.00% of designs)
+
+2. Pragma Count per Design Distribution:
+----------------------------------------------------------------------
+  -   1 pragmas:      16 designs (  0.01%)
+  -   2 pragmas:      81 designs (  0.04%)
+  -   3 pragmas:   1,120 designs (  0.61%)
+  -   4 pragmas:  21,283 designs ( 11.52%)
+  -   5 pragmas:  39,414 designs ( 21.34%)
+  -   6 pragmas:  24,469 designs ( 13.25%)
+  -   7 pragmas:  12,622 designs (  6.83%)
+  -   8 pragmas:  19,639 designs ( 10.63%)
+  -   9 pragmas:   5,966 designs (  3.23%)
+  -  10 pragmas:  13,270 designs (  7.18%)
+  -  11 pragmas:   6,246 designs (  3.38%)
+  -  12 pragmas:   7,480 designs (  4.05%)
+  -  13 pragmas:   2,160 designs (  1.17%)
+  -  14 pragmas:   4,541 designs (  2.46%)
+  -  15 pragmas:     936 designs (  0.51%)
+  -  16 pragmas:   2,781 designs (  1.51%)
+  -  17 pragmas:     769 designs (  0.42%)
+  -  18 pragmas:     304 designs (  0.16%)
+  -  19 pragmas:   2,499 designs (  1.35%)
+  -  20 pragmas:     594 designs (  0.32%)
+  -  21 pragmas:   1,834 designs (  0.99%)
+  -  22 pragmas:   2,699 designs (  1.46%)
+  -  23 pragmas:   1,952 designs (  1.06%)
+  -  24 pragmas:   1,966 designs (  1.06%)
+  -  25 pragmas:     781 designs (  0.42%)
+  -  26 pragmas:   2,114 designs (  1.14%)
+  -  27 pragmas:     164 designs (  0.09%)
+  -  28 pragmas:   1,908 designs (  1.03%)
+  -  30 pragmas:   1,321 designs (  0.72%)
+  -  32 pragmas:   2,576 designs (  1.39%)
+  -  42 pragmas:     293 designs (  0.16%)
+  -  90 pragmas:     733 designs (  0.40%)
+  - 167 pragmas:       1 designs (  0.00%)
+  - 385 pragmas:     185 designs (  0.10%)
+
+3. Pipeline Pragma Breakdown:
+----------------------------------------------------------------------
+  - off                 :  408,906
+  - default/enable      :  159,166
+
+4. Unroll Pragma Breakdown:
+----------------------------------------------------------------------
+  - factor_1            :  172,515
+  - factor_2            :  142,982
+  - factor_4            :  114,198
+  - factor_8            :   85,292
+  - factor_16           :   53,640
+
+5. Array Partition Breakdown:
+----------------------------------------------------------------------
+  - cyclic              :  614,103
+  - complete            :    1,627
+  - block               :      578
+
+6. Top 20 Most Frequent Full Pragma Patterns:
+----------------------------------------------------------------------
+  - [408,906x] #pragma HLS PIPELINE OFF
+  - [172,515x] #pragma HLS UNROLL factor=1
+  - [159,166x] #pragma HLS PIPELINE
+  - [142,982x] #pragma HLS UNROLL factor=2
+  - [114,198x] #pragma HLS UNROLL factor=4
+  - [ 85,292x] #pragma HLS UNROLL factor=8
+  - [ 53,640x] #pragma HLS UNROLL factor=16
+  - [ 19,795x] #pragma HLS LOOP_TRIPCOUNT min=1 max=1024
+  - [ 14,124x] #pragma HLS ARRAY_PARTITION variable=output type=cyclic dim=1 factor=1
+  - [ 12,950x] #pragma HLS ARRAY_PARTITION variable=output type=cyclic dim=1 factor=2
+  - [ 12,847x] #pragma HLS INLINE
+  - [ 11,815x] #pragma HLS ARRAY_PARTITION variable=output type=cyclic dim=1 factor=4
+  - [ 10,681x] #pragma HLS ARRAY_PARTITION variable=output type=cyclic dim=1 factor=8
+  - [ 10,643x] #pragma HLS ARRAY_PARTITION variable=output type=cyclic dim=1 factor=16
+  - [ 10,557x] #pragma HLS ARRAY_PARTITION variable=A type=cyclic dim=1 factor=1
+  - [  9,119x] #pragma HLS ARRAY_PARTITION variable=A type=cyclic dim=1 factor=2
+  - [  8,392x] #pragma HLS ARRAY_PARTITION variable=input type=cyclic dim=1 factor=1
+  - [  7,836x] #pragma HLS ARRAY_PARTITION variable=input type=cyclic dim=1 factor=2
+  - [  7,512x] #pragma HLS ARRAY_PARTITION variable=A type=cyclic dim=1 factor=4
+  - [  7,283x] #pragma HLS ARRAY_PARTITION variable=input type=cyclic dim=1 factor=4

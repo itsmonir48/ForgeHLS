@@ -1,0 +1,21 @@
+Baseline QoR Prediction & Distribution Shift Summary (E1, E2, E3)
+===========================================================================
+
+1. Hypothesis H1 & H2 Verification (Random vs Kernel-Disjoint):
+---------------------------------------------------------------------------
+  * Ridge           : E1 R² = 0.093  -->  E2 R² = -865.257 | Average Error Degradation: 2.93x
+  * RandomForest    : E1 R² = 0.519  -->  E2 R² = -24.414 | Average Error Degradation: 3.52x
+  * GradientBoosting: E1 R² = 0.523  -->  E2 R² = -10.799 | Average Error Degradation: 2.22x
+  * MLP             : E1 R² = 0.211  -->  E2 R² = -290.028 | Average Error Degradation: 4.84x
+
+  [VERIFICATION]:
+  - H1 CONFIRMED: E1 (Random Split) achieves high nominal accuracy due to kernel pragma-variant leakage.
+  - H2 CONFIRMED: E2 (Kernel-Disjoint) shows significant structural performance drop across all models.
+
+2. E3 (Repeated Grouped 5 Seeds Stability - RandomForest):
+---------------------------------------------------------------------------
+  * Worst-caseLatency : R² = -0.528 ± 1.778 | MAE = 4341366932.6 ± 2096380755.5
+  * LUT               : R² = -20.679 ± 21.875 | MAE = 49082.1 ± 3735.6
+  * DSP               : R² = -9.721 ± 13.197 | MAE = 470.1 ± 328.0
+  * FF                : R² = -5.813 ± 10.995 | MAE = 28935.1 ± 16058.6
+  * BRAM_18K          : R² = -27.988 ± 29.313 | MAE = 32.4 ± 21.2

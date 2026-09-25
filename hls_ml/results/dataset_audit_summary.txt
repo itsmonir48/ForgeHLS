@@ -1,0 +1,39 @@
+ForgeHLS Dataset Audit
+======================================================================
+Total records: 184,717
+Unique sources: 11
+Unique algorithms: 471
+Unique design IDs: 1,242
+Unique source+algorithm groups: 491
+
+Strategy distribution:
+high-latency-low-resource: 61,886
+medium-latency-medium-resource: 61,419
+low-latency-high-resource: 61,412
+
+is_pareto:
+True: 3,803
+False: 180,914
+
+is_kernel:
+False: 184,717
+
+Missing values:
+Part: 0
+TargetClockPeriod: 0
+Best-caseLatency: 0
+Worst-caseLatency: 0
+BRAM_18K: 0
+LUT: 0
+DSP: 0
+FF: 0
+design_id: 0
+algo_name: 0
+source_name: 0
+source_code: 0
+code_length: 0
+pragma_number: 0
+is_pareto: 0
+is_kernel: 0
+top_function_name: 0
+latency-resource-strategy: 0

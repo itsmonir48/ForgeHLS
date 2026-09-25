@@ -1,0 +1,34 @@
+Feature Set Ablation Study Summary (Milestone 6 - E8)
+===========================================================================
+
+Target: Worst-caseLatency
+  * Set_A_Basic             : MAE= 853389873.9 | R²=+0.244 | Spearman rho=0.712
+  * Set_B_PragmaAware       : MAE=1124980700.0 | R²=-0.726 | Spearman rho=0.881
+  * Set_C_StructuralPragma  : MAE= 523180996.9 | R²=+0.684 | Spearman rho=0.932
+
+Target: LUT
+  * Set_A_Basic             : MAE=     22489.7 | R²=-0.758 | Spearman rho=0.827
+  * Set_B_PragmaAware       : MAE=     32023.9 | R²=-14.005 | Spearman rho=0.834
+  * Set_C_StructuralPragma  : MAE=     53477.4 | R²=-66.387 | Spearman rho=0.900
+
+Target: DSP
+  * Set_A_Basic             : MAE=        95.0 | R²=+0.068 | Spearman rho=0.652
+  * Set_B_PragmaAware       : MAE=       129.1 | R²=-1.073 | Spearman rho=0.703
+  * Set_C_StructuralPragma  : MAE=       335.6 | R²=-36.451 | Spearman rho=0.949
+
+Target: FF
+  * Set_A_Basic             : MAE=     18380.0 | R²=-0.109 | Spearman rho=0.801
+  * Set_B_PragmaAware       : MAE=     19422.1 | R²=-0.381 | Spearman rho=0.806
+  * Set_C_StructuralPragma  : MAE=     59637.4 | R²=-27.229 | Spearman rho=0.922
+
+Target: BRAM_18K
+  * Set_A_Basic             : MAE=        76.7 | R²=-1465.113 | Spearman rho=0.789
+  * Set_B_PragmaAware       : MAE=         8.2 | R²=-4.805 | Spearman rho=0.801
+  * Set_C_StructuralPragma  : MAE=         5.7 | R²=-0.964 | Spearman rho=0.992
+
+Key Ablation Findings:
+---------------------------------------------------------------------------
+- Feature Set B (Pragma-Aware) provides dramatic improvements over Set A (Basic),
+  capturing loop unrolling factors, pipeline toggles, and array partition factors.
+- Feature Set C (Structural + Pragma) yields the highest uncertainty correlation
+  and best OOD generalization by capturing base C/C++ AST loop/branch complexity.

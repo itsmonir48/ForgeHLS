@@ -1,0 +1,11 @@
+Method,Target,Spearman_Correlation,MAE_Lowest_Uncertainty_Q1,MAE_Highest_Uncertainty_Q5,Uncertainty_Error_Ratio_Q5_vs_Q1,Mean_Uncertainty
+Tree_Ensemble_UQ,Worst-caseLatency,0.943,113.81,1845927569.62,16218789.2,552554380.02
+Tree_Ensemble_UQ,LUT,0.904,291.19,221176.39,759.57,48291.91
+Tree_Ensemble_UQ,DSP,0.9496,1.74,1467.29,843.02,374.6
+Tree_Ensemble_UQ,FF,0.9234,175.86,260271.98,1479.97,47054.33
+Tree_Ensemble_UQ,BRAM_18K,0.9919,0.23,26.38,113.69,4.04
+Deep_Ensemble_UQ,Worst-caseLatency,0.7483,835054912.0,5907509248.0,7.07,1149666304.0
+Deep_Ensemble_UQ,LUT,0.7495,2442.88,39561.14,16.19,10717.56
+Deep_Ensemble_UQ,DSP,0.6023,24.9,365.04,14.66,83.33
+Deep_Ensemble_UQ,FF,0.8206,1241.01,46826.72,37.73,8225.49
+Deep_Ensemble_UQ,BRAM_18K,0.904,1.3,148.66,114.25,38.8

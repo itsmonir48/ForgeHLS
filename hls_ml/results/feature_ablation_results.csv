@@ -1,0 +1,16 @@
+Feature_Set,Num_Features,Target,R2,MAE,Spearman_rho,Mean_Uncertainty
+Set_A_Basic,3,Worst-caseLatency,0.2436,853389873.94,0.7122,661919418.58
+Set_A_Basic,3,LUT,-0.7578,22489.71,0.8266,9965.91
+Set_A_Basic,3,DSP,0.0684,95.05,0.6524,29.86
+Set_A_Basic,3,FF,-0.1087,18380.01,0.8009,7691.51
+Set_A_Basic,3,BRAM_18K,-1465.1129,76.73,0.789,25.76
+Set_B_PragmaAware,28,Worst-caseLatency,-0.7256,1124980699.95,0.8814,350864585.56
+Set_B_PragmaAware,28,LUT,-14.0053,32023.94,0.8342,30687.71
+Set_B_PragmaAware,28,DSP,-1.0734,129.06,0.7031,101.8
+Set_B_PragmaAware,28,FF,-0.3807,19422.13,0.8059,18198.99
+Set_B_PragmaAware,28,BRAM_18K,-4.8051,8.2,0.8011,14.74
+Set_C_StructuralPragma,42,Worst-caseLatency,0.6843,523180996.95,0.9322,592085188.84
+Set_C_StructuralPragma,42,LUT,-66.3873,53477.38,0.9002,45967.79
+Set_C_StructuralPragma,42,DSP,-36.4507,335.58,0.9489,382.18
+Set_C_StructuralPragma,42,FF,-27.2292,59637.39,0.922,46715.64
+Set_C_StructuralPragma,42,BRAM_18K,-0.9636,5.73,0.992,3.95

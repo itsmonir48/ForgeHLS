@@ -1,0 +1,1634 @@
+হ্যাঁ। এবার আমি তোমার জন্য এটাকে **একটা complete research roadmap** হিসেবে ধরছি। তবে আগে একটা গুরুত্বপূর্ণ update: সেপ্টেম্বর ২০২৬-এর current literature দেখে বোঝা যাচ্ছে HLS QoR prediction এখন active area। ForgeHLS নিজেই QoR prediction ও automated pragma exploration দিয়েছে; 2026-এ DiffHLS differential QoR prediction এবং MailoHLS Pareto-driven pragma optimization-এর মতো কাজও এসেছে। তাই আমাদের paper-এর novelty **“ML দিয়ে QoR predict করা”** হবে না। ([arXiv][1])
+
+আমাদের strongest, manageable thesis direction হবে:
+
+> **Uncertainty-Aware Multi-Objective HLS QoR Prediction Under Kernel-Level Distribution Shift**
+
+---
+
+# 1. পুরো thesis এক লাইনে কী?
+
+তুমি একটি HLS design/configuration দেখে predict করবে:
+
+$$
+\hat y =
+[\widehat{Latency},
+\widehat{LUT},
+\widehat{DSP},
+\widehat{FF},
+\widehat{BRAM}]
+$$
+
+কিন্তু শুধু prediction নয়।
+
+তুমি আরও বলবে:
+
+$$
+u(x)=\text{prediction uncertainty}
+$$
+
+অর্থাৎ:
+
+> **“এই prediction কতটা বিশ্বাসযোগ্য?”**
+
+এবং model-কে এমন kernel-এ test করবে যেটা training-এ **কখনো দেখেনি**।
+
+---
+
+# 2. Existing work কী?
+
+এটা বুঝতে না পারলে novelty ভুলভাবে claim করবে।
+
+## Existing Work A — ForgeHLS
+
+ForgeHLS হলো বড়-scale HLS dataset। Original paper 400K+ designs এবং 846 kernels report করেছে; data automated pragma insertion এবং extensive design-space exploration থেকে এসেছে। তারা QoR prediction ও automated pragma exploration-কে downstream tasks হিসেবে দেখিয়েছে। ([arXiv][1])
+
+তোমার downloaded release-এর actual JSON artifact-এ আমরা **184,717 records / 471 algorithm names / 491 source+algorithm groups** পেয়েছি। Paper-এ final numbers লেখার সময় downloaded release/version-এর exact observed counts ব্যবহার করব।
+
+### ForgeHLS আমাদের কী দিচ্ছে?
+
+```text
+C/C++ source
++
+HLS configurations/pragmas
++
+synthesis-derived QoR
+```
+
+যেমন:
+
+```text
+Worst-caseLatency
+LUT
+DSP
+FF
+BRAM_18K
+```
+
+Dataset documentation-এ design-level synthesis results এবং source/configuration information-এর কথা আছে। ([Hugging Face][2])
+
+---
+
+## Existing Work B — ML-based HLS QoR prediction
+
+আগেও ML দিয়ে HLS QoR prediction হয়েছে। তাই শুধু:
+
+```text
+Random Forest
+XGBoost
+MLP
+```
+
+চালিয়ে QoR predict করে “novel method” বলা যাবে না।
+
+Q-PIR-ও Random Forest/GP family-এর limitation এবং uncertainty ব্যবহার করে Pareto-front discovery-এর দিকে গেছে; তাদের method Quantile Regression Forest-এর prediction intervals ব্যবহার করে। ([ScienceDirect][3])
+
+---
+
+## Existing Work C — recent advanced prediction
+
+2026-এর DiffHLS kernel-design pair ব্যবহার করে differential learning করেছে, GNN দিয়ে representation এবং pretrained code-LLM embeddings ব্যবহার করেছে; ForgeHLS-এ scalabilityও দেখিয়েছে। ([ResearchGate][4])
+
+এটার implication:
+
+> **শুধু “better predictor” বানানো খুব সহজ novelty claim হবে না।**
+
+---
+
+## Existing Work D — recent Pareto/optimization work
+
+MailoHLS 2026-এ LLM + GNN + PEFT ব্যবহার করে Pareto-driven pragma optimization করেছে, seen ও unseen kernels দুটোতেই evaluation করেছে। ([arXiv][5])
+
+HLS-Seek 2026-এ proxy reward model এবং uncertainty-aware MC dropout দিয়ে low-confidence candidates selectively synthesize করার ধারণা দিয়েছে। ([arXiv][6])
+
+তাই:
+
+> **“আমরা uncertainty ব্যবহার করেছি” একা novel claim-ও হবে না।**
+
+আমাদের contribution-এর combination এবং exact experimental question গুরুত্বপূর্ণ।
+
+---
+
+# 3. তাহলে আমাদের research gap কোথায়?
+
+আমাদের gap-টা হবে:
+
+### Existing literature-এ
+
+অনেক কাজ:
+
+* QoR prediction করে
+* unseen kernels evaluate করে
+* DSE accelerate করে
+* uncertainty ব্যবহার করে
+
+কিন্তু আমরা একটি **strict reliability-oriented evaluation framework** বানাব যেখানে:
+
+```text
+kernel-level distribution shift
++
+multi-objective prediction
++
+uncertainty
++
+calibration
++
+selective prediction
+```
+
+একসাথে systematically evaluate করা হবে।
+
+সুতরাং novelty-এর wording হবে:
+
+> **A systematic reliability study and uncertainty-aware evaluation of multi-objective HLS QoR prediction under kernel-level distribution shift.**
+
+এটা “first-ever” বলার দরকার নেই।
+
+---
+
+# 4. Thesis-এর মূল hypothesis
+
+আমরা চারটি hypothesis রাখব।
+
+### H1 — Random split is optimistic
+
+একই logical kernel-এর configuration variants random split-এ train/test দুইদিকে গেলে performance inflated হতে পারে।
+
+### H2 — Kernel-disjoint split is harder
+
+একেবারে নতুন logical kernel এ গেলে error বাড়বে।
+
+### H3 — Uncertainty is informative
+
+যেসব sample-এ uncertainty বেশি, সেখানে actual QoR errorও বেশি হওয়ার tendency থাকবে।
+
+### H4 — Selective prediction helps
+
+Uncertain samples reject/abstain করলে accepted predictions-এর error কমতে পারে।
+
+এগুলো **results আগে থেকে assume করা নয়**। Experiment এগুলো support বা reject করবে।
+
+---
+
+# 5. Dataset structure — তোমার actual data
+
+আমরা audit করে পেয়েছি:
+
+```text
+Total records           = 184,717
+Unique algorithms       = 471
+Unique sources          = 11
+Source+algorithm groups = 491
+Unique design IDs       = 1,242
+Pareto designs          = 3,803
+Missing core fields     = 0
+```
+
+সবচেয়ে interesting:
+
+```text
+CHStone + aes
+→ 1214 rows
+→ 1 base source after removing HLS pragmas
+```
+
+এবং total 483 multi-row groups-এর ক্ষেত্রে pragma-removal-এর পর একটি base source পাওয়া গেছে।
+
+এটা strongly suggests:
+
+```text
+logical kernel group
+        ↓
+same base program
+        ↓
+many pragma/configuration variants
+        ↓
+different QoR
+```
+
+আমরা paper-এ এটাকে **empirical grouping rule** হিসেবে describe করব, absolute semantic truth হিসেবে নয়।
+
+---
+
+# 6. Logical kernel কীভাবে define করব?
+
+আমাদের provisional group ID:
+
+$$
+G=(source\_name,algo\_name)
+$$
+
+অর্থাৎ:
+
+```text
+CHStone::aes
+MachSuite::aes
+```
+
+দুটো আলাদা groups।
+
+কারণ একই `algo_name` একাধিক source family-তে আছে; তোমার audit-এ এমন 20টি algorithm পেয়েছিলে।
+
+`design_id` ব্যবহার করব না।
+
+`is_kernel` ব্যবহার করব না, কারণ এই release-এ সব False।
+
+---
+
+# 7. Input features কী হবে?
+
+এটা খুব গুরুত্বপূর্ণ।
+
+## আমরা এগুলো model feature হিসেবে **দেব না**
+
+```text
+❌ source_name
+❌ algo_name
+❌ design_id
+❌ latency-resource-strategy
+```
+
+কারণ এগুলো identity/derived information এবং leakage বা memorization তৈরি করতে পারে।
+
+---
+
+## আমাদের feature set
+
+### Feature Set A — Basic
+
+```text
+TargetClockPeriod
+code_length
+pragma_number
+```
+
+### Feature Set B — Pragma-aware
+
+A +:
+
+```text
+pipeline_count
+pipeline_enabled
+pipeline_disabled
+unroll_count
+max_unroll_factor
+array_partition_count
+max_partition_factor
+array_reshape_count
+dataflow_count
+inline_count
+resource_count
+bind_op_count
+bind_storage_count
+...
+```
+
+### Feature Set C — Structural
+
+B + source-code structural features:
+
+```text
+function_count
+loop_count
+nested_loop_count
+branch_count
+array_count
+operator_count
+memory_access_count
+maximum nesting depth
+...
+```
+
+এগুলো source code থেকে deterministic extraction হবে।
+
+---
+
+# 8. `latency-resource-strategy` কেন বাদ?
+
+তোমার dataset-এ:
+
+```text
+high-latency-low-resource
+medium-latency-medium-resource
+low-latency-high-resource
+```
+
+এবং নামের মধ্যেই target-related information আছে।
+
+তাই:
+
+> **input হিসেবে নেওয়া unsafe।**
+
+বরং later analysis-এ group label হিসেবে ব্যবহার করা যায়, যদি প্রয়োজন হয়।
+
+---
+
+# 9. Target কী?
+
+আমি first paper-এ রাখব:
+
+```text
+Worst-caseLatency
+LUT
+DSP
+FF
+BRAM_18K
+```
+
+Optional:
+
+```text
+TargetClockPeriod
+```
+
+এটা input হবে যদি experiment design অনুযায়ী ঠিক থাকে।
+
+---
+
+# 10. একসাথে সব target predict করব?
+
+দুইভাবে পরীক্ষা করব।
+
+### Approach 1 — Separate regressors
+
+```text
+Model → Latency
+Model → LUT
+Model → DSP
+Model → FF
+Model → BRAM
+```
+
+### Approach 2 — Multi-output
+
+```text
+Model
+ ↓
+[
+Latency,
+LUT,
+DSP,
+FF,
+BRAM
+]
+```
+
+যেটা empirically ভালো/appropriate হবে সেটা report করব।
+
+আমি আলাদা target results **must-have** রাখব।
+
+---
+
+# 11. Models
+
+প্রথম phase:
+
+### Baseline 1
+
+Linear/Ridge Regression
+
+### Baseline 2
+
+Random Forest
+
+### Baseline 3
+
+Gradient Boosting / XGBoost
+
+### Baseline 4
+
+MLP
+
+এগুলো baseline।
+
+আমাদের “proposed method” কোনো exotic new architecture হওয়া বাধ্যতামূলক নয়। Proposed contribution হবে **evaluation + reliability framework**।
+
+---
+
+# 12. Experiment 1 — Random row split
+
+Standard baseline:
+
+```text
+80% train
+20% test
+```
+
+এখানে metrics:
+
+$$
+MAE,\ RMSE,\ R^2
+$$
+
+এটা শুধু baseline।
+
+---
+
+# 13. Experiment 2 — Kernel-disjoint split
+
+এটাই main experiment।
+
+491 logical groups:
+
+```text
+Train groups ≠ Test groups
+```
+
+ধরো:
+
+```text
+Train:
+CHStone/aes
+PolyBench/ludcmp
+MachSuite/viterbi
+...
+
+Test:
+rtl_module/barrel_shifter
+operators/...
+...
+```
+
+একটি test group-এর **কোনো row** training-এ থাকবে না।
+
+---
+
+# 14. কেন এটি powerful?
+
+ধরো:
+
+```text
+Kernel A:
+1000 configs
+```
+
+Random split:
+
+```text
+800 train
+200 test
+```
+
+Model kernel A-এর structure অনেকটা মুখস্থ করতে পারে।
+
+Kernel-disjoint:
+
+```text
+1000 train rows for Kernel A
+→ all in train or all in test
+```
+
+Test-এ নতুন kernel।
+
+তখন question:
+
+> **Does the learned relationship generalize beyond the kernel identities seen during training?**
+
+এটাই strong scientific test।
+
+---
+
+# 15. Split আরও শক্ত করতে পারি
+
+Main experiment:
+
+```text
+Group-disjoint random split
+```
+
+আর robust experiment:
+
+```text
+Repeated grouped split
+seed = 0,1,2,3,4
+```
+
+Report:
+
+$$
+mean \pm std
+$$
+
+---
+
+# 16. Family-level generalization — optional but powerful
+
+তোমার dataset-এ 11 source families আছে।
+
+তাই second stress test:
+
+```text
+Train on some source families
+Test on an unseen source family
+```
+
+এটা kernel-disjoint-এর চেয়েও harder হতে পারে।
+
+তবে এই split meaningful কিনা dataset distribution দেখে finalise করব।
+
+---
+
+# 17. Uncertainty module
+
+এখানেই main novelty শুরু।
+
+## Method A — Quantile Regression Forest
+
+Random Forest-এর quantiles থেকে:
+
+```text
+lower quantile
+median
+upper quantile
+```
+
+উদাহরণ:
+
+```text
+Predicted LUT = 5000
+90% PI = [4600, 5550]
+```
+
+Q-PIR HLS context-এ quantile regression forest এবং prediction intervals ব্যবহার করেছে, তাই literature baseline হিসেবে এটি relevant। ([ScienceDirect][3])
+
+---
+
+# 18. Method B — Deep Ensemble
+
+MLP-এর multiple independently trained copies:
+
+```text
+MLP_1
+MLP_2
+MLP_3
+MLP_4
+MLP_5
+```
+
+এক sample-এ:
+
+```text
+1000
+1015
+995
+1008
+1003
+```
+
+variance low।
+
+অন্য sample:
+
+```text
+1000
+1500
+800
+1700
+1100
+```
+
+variance high।
+
+এটাই epistemic-style uncertainty signal হিসেবে ব্যবহার করা যায়।
+
+---
+
+# 19. Uncertainty কীভাবে validate করব?
+
+শুধু uncertainty score দেখালে হবে না।
+
+আমরা check করব:
+
+$$
+u(x) \uparrow \Rightarrow |y-\hat y| \uparrow ?
+$$
+
+Metrics:
+
+```text
+Spearman correlation
+Pearson correlation
+error by uncertainty quantile
+```
+
+Example:
+
+```text
+Lowest uncertainty 20%
+→ MAE = ?
+
+Highest uncertainty 20%
+→ MAE = ?
+```
+
+যদি clear separation হয়, সেটা strong evidence।
+
+---
+
+# 20. Calibration
+
+ধরো model 90% prediction interval দিয়েছে।
+
+আমরা check করব:
+
+$$
+P(y \in PI_{90}) \approx 0.90
+$$
+
+আরও:
+
+```text
+50% interval
+70%
+80%
+90%
+95%
+```
+
+এর empirical coverage বের করব।
+
+Figure:
+
+```text
+x = nominal coverage
+y = observed coverage
+```
+
+Ideal diagonal থাকবে।
+
+---
+
+# 21. Prediction interval width
+
+Coverage একাই যথেষ্ট নয়।
+
+ধরো:
+
+```text
+90% interval = [0, 1,000,000]
+```
+
+এটা প্রায় সবকিছু cover করবে, কিন্তু useless।
+
+তাই report:
+
+```text
+Coverage
++
+Interval Width
+```
+
+যেমন normalized interval width।
+
+---
+
+# 22. Selective prediction
+
+এখানে model বলবে:
+
+```text
+CONFIDENT → accept
+UNCERTAIN → abstain
+```
+
+তারপর:
+
+```text
+Coverage 100%
+→ MAE = X
+
+Coverage 90%
+→ MAE = Y
+
+Coverage 70%
+→ MAE = Z
+```
+
+এবং plot:
+
+> **Risk-Coverage Curve**
+
+এটা practical contribution।
+
+---
+
+# 23. HLS interpretation
+
+Practical workflow:
+
+```text
+HLS configuration
+        ↓
+ML predictor
+        ↓
+QoR + uncertainty
+        ↓
+Low uncertainty?
+   /          \
+ YES           NO
+ ↓             ↓
+Use estimate   Verify with synthesis
+```
+
+এখানে আমরা বলব না:
+
+> “synthesis আর লাগবে না।”
+
+বরং:
+
+> **Uncertain predictions can be flagged for expensive verification.**
+
+এটা much more defensible।
+
+---
+
+# 24. Multi-objective aspect
+
+তুমি শুধু latency predict করলে paper weaker হবে।
+
+আমরা একসাথে:
+
+```text
+Latency
+LUT
+DSP
+FF
+BRAM
+```
+
+predict করব।
+
+তারপর uncertainty-ও target-wise:
+
+```text
+Latency uncertainty
+LUT uncertainty
+DSP uncertainty
+...
+```
+
+---
+
+# 25. Optional Pareto analysis
+
+এটা thesis-এর secondary experiment।
+
+Predicted QoR দিয়ে Pareto candidates বের করব।
+
+তারপর actual QoR-এর Pareto frontier-এর সঙ্গে compare:
+
+```text
+Predicted Pareto front
+        vs
+True Pareto front
+```
+
+Metrics হতে পারে:
+
+```text
+Pareto recall
+Hypervolume ratio
+Front distance
+```
+
+এটা তোমার earlier #2 DSE idea-কে partially ব্যবহার করবে।
+
+কিন্তু **paper-এর main contribution Pareto search নয়**।
+
+---
+
+# 26. কেন Pareto analysis secondary রাখছি?
+
+কারণ recent works ইতিমধ্যে Pareto-driven HLS optimization করছে—MailoHLS, HLS-Seek ইত্যাদি। ([arXiv][5])
+
+তাই আমরা বলব:
+
+> uncertainty-aware QoR prediction can additionally support Pareto candidate filtering.
+
+এটা মূল contribution-এর application।
+
+---
+
+# 27. Feature ablation
+
+এই experiment paper-এর জন্য খুব useful:
+
+```text
+Basic
+   ↓
+Pragma-aware
+   ↓
+Structural + pragma
+```
+
+Compare:
+
+```text
+MAE
+RMSE
+R²
+uncertainty quality
+```
+
+Question:
+
+> **What information is actually necessary for generalizable QoR prediction?**
+
+---
+
+# 28. Model ablation
+
+```text
+RF
+RF + uncertainty
+MLP
+MLP + uncertainty
+```
+
+এতে বোঝা যাবে uncertainty module বাস্তবে value যোগ করছে কিনা।
+
+---
+
+# 29. Kernel-wise analysis
+
+Test set-এর প্রতিটি unseen logical group-এর জন্য:
+
+```text
+kernel group
+↓
+MAE
+↓
+uncertainty
+```
+
+তারপর:
+
+> কোন ধরনের kernel-এর prediction কঠিন?
+
+এখানে meaningful findings আসতে পারে।
+
+---
+
+# 30. Error vs kernel size
+
+যেমন:
+
+```text
+code_length
+vs
+prediction error
+```
+
+এতে বোঝা যায় বড়/complex kernels harder কিনা।
+
+---
+
+# 31. Error vs optimization intensity
+
+যেমন:
+
+```text
+pragma_number
+vs
+prediction error
+```
+
+এতে দেখা যাবে aggressively optimized designs harder কিনা।
+
+---
+
+# 32. Error vs distribution shift
+
+একই model-এর:
+
+```text
+Random split
+vs
+Kernel-disjoint
+vs
+Family-disjoint
+```
+
+এবং uncertainty behaviour compare করব।
+
+এটাই thesis-এর সবচেয়ে interesting analysis হতে পারে:
+
+> **Does uncertainty degrade gracefully as distribution shift increases?**
+
+---
+
+# 33. এই একটা experiment paper-কে অনেক শক্তিশালী করতে পারে
+
+ধরো:
+
+```text
+Random split
+        ↓
+Low error
+Low uncertainty
+
+Kernel-disjoint
+        ↓
+Higher error
+Higher uncertainty
+
+Family-disjoint
+        ↓
+Even higher error
+Even higher uncertainty
+```
+
+এবং যদি uncertainty এই degradation predict করতে পারে:
+
+> তাহলে model শুধু accurate না, **self-aware/reliability-aware**।
+
+এটাই paper-এর strongest story হতে পারে।
+
+---
+
+# 34. Statistical analysis
+
+শুধু একটা run নিয়ে paper লিখব না।
+
+Group split-এর জন্য:
+
+```text
+5 seeds minimum
+```
+
+Report:
+
+$$
+mean \pm std
+$$
+
+আর model comparison-এর ক্ষেত্রে paired comparison/per-seed analysis করা ভালো।
+
+Conference paper-এর space অনুযায়ী exact statistical test নির্বাচন করব।
+
+---
+
+# 35. Baseline comparison কী হবে?
+
+একটা table:
+
+| Model   | Random MAE | Unseen-Kernel MAE | R² | Uncertainty  |
+| ------- | ---------: | ----------------: | -: | ------------ |
+| Ridge   |            |                   |    | —            |
+| RF      |            |                   |    | QRF          |
+| XGBoost |            |                   |    | QRF/ensemble |
+| MLP     |            |                   |    | Ensemble     |
+
+**Numbers এখন বানানো হবে না।**
+
+---
+
+# 36. Final proposed method
+
+Paper-এর method section-এ architecture এভাবে:
+
+```text
+             HLS Design
+                  │
+          ┌───────┴───────┐
+          ↓               ↓
+   Code features      Pragma features
+          │               │
+          └───────┬───────┘
+                  ↓
+          Feature Encoder
+                  ↓
+          QoR Predictor
+                  ↓
+      ┌───────────┼───────────┐
+      ↓           ↓           ↓
+   Latency       LUT      DSP/FF/BRAM
+      │           │           │
+      └───────────┼───────────┘
+                  ↓
+       Uncertainty Estimator
+                  ↓
+          Calibration layer
+                  ↓
+       Selective prediction
+```
+
+---
+
+# 37. Exact novelty map
+
+এটা খুব clear রাখবে।
+
+### Existing
+
+```text
+Large HLS dataset
+QoR prediction
+ML models
+Unseen-kernel evaluation
+```
+
+### Our new contribution
+
+```text
+Kernel-disjoint reliability study
++
+Multi-objective uncertainty
++
+Calibration
++
+Selective prediction
++
+Distribution-shift analysis
+```
+
+### Optional application
+
+```text
+Uncertainty-aware Pareto filtering
+```
+
+---
+
+# 38. Paper-এ কী claim করবে না
+
+❌ “First HLS QoR predictor”
+
+❌ “First uncertainty-aware HLS system”
+
+❌ “First unseen-kernel evaluation”
+
+কারণ literature-এ এগুলোর prior examples আছে। Q-PIR uncertainty ব্যবহার করেছে, ForgeHLS unseen evaluation করেছে, এবং recent HLS-Seek uncertainty-aware selection-ও করছে। ([ScienceDirect][3])
+
+### Claim হবে
+
+> **We provide a systematic kernel-level distribution-shift and reliability evaluation of multi-objective HLS QoR prediction, with calibrated uncertainty and selective prediction.**
+
+এটা much safer।
+
+---
+
+# 39. Complete paper structure
+
+এখন paper একদম section-by-section:
+
+## I. Introduction
+
+### Paragraph 1
+
+HLS importance
+
+### Paragraph 2
+
+HLS DSE is expensive
+
+### Paragraph 3
+
+ML QoR prediction opportunity
+
+### Paragraph 4
+
+Problem with random/row-level generalization
+
+### Paragraph 5
+
+Uncertainty/reliability motivation
+
+### Paragraph 6
+
+Our contributions
+
+---
+
+# 40. Introduction-এর contribution list
+
+Paper-এ roughly:
+
+1. **A kernel-grouped evaluation protocol** for leakage-resistant HLS QoR prediction under unseen-kernel distribution shift.
+
+2. **A multi-objective QoR prediction framework** covering latency and FPGA resource metrics.
+
+3. **An uncertainty estimation and calibration framework** for quantifying prediction reliability.
+
+4. **A selective prediction analysis** showing whether uncertain predictions can be safely deferred for verification.
+
+5. **A large-scale empirical study on ForgeHLS** with repeated experiments and detailed error/distribution-shift analysis.
+
+এগুলো actual experiments-এর ওপর ভিত্তি করে final wording হবে।
+
+---
+
+# 41. II. Related Work
+
+### A. HLS DSE
+
+Existing optimization/search methods.
+
+### B. ML-based HLS QoR prediction
+
+Traditional ML, GNN, code models.
+
+### C. Large-scale HLS datasets
+
+HLSFactory, ForgeHLS etc. ([arXiv][7])
+
+### D. Uncertainty-aware prediction
+
+Q-PIR and recent approaches. ([ScienceDirect][3])
+
+### E. Generalization to unseen kernels
+
+ForgeHLS and recent 2026 work.
+
+---
+
+# 42. III. Dataset and Problem Formulation
+
+### A. ForgeHLS dataset
+
+Your exact downloaded release statistics.
+
+### B. Logical kernel grouping
+
+$$
+G=(source,algorithm)
+$$
+
+### C. Leakage considerations
+
+Why `design_id`, identity, derived strategy are excluded.
+
+### D. Input features
+
+### E. Target QoR
+
+$$
+y=[latency,LUT,DSP,FF,BRAM]
+$$
+
+---
+
+# 43. IV. Methodology
+
+### A. Feature engineering
+
+### B. Baseline predictors
+
+### C. Kernel-disjoint splitting
+
+### D. Uncertainty estimation
+
+### E. Calibration
+
+### F. Selective prediction
+
+### G. Optional Pareto filtering
+
+---
+
+# 44. V. Experimental Setup
+
+Must include:
+
+```text
+dataset version
+number of records
+number of groups
+hardware
+software versions
+models
+hyperparameters
+random seeds
+split protocol
+metrics
+```
+
+এখানে reproducibility খুব important।
+
+---
+
+# 45. VI. Results
+
+আমি order দেব:
+
+### A. Dataset statistics
+
+### B. Random-split baseline
+
+### C. Kernel-disjoint generalization
+
+### D. Distribution-shift analysis
+
+### E. Uncertainty quality
+
+### F. Calibration
+
+### G. Selective prediction
+
+### H. Ablation
+
+### I. Optional Pareto analysis
+
+---
+
+# 46. VII. Discussion
+
+এখানে answer করবে:
+
+> Why does random performance differ from unseen performance?
+
+> Which QoR target is hardest?
+
+> Does uncertainty track error?
+
+> Which features matter?
+
+> When should the predictor be trusted?
+
+---
+
+# 47. VIII. Threats to Validity
+
+এটা অবশ্যই থাকবে।
+
+যেমন:
+
+* single dataset family
+* dataset construction assumptions
+* source/algorithm grouping heuristic
+* stored synthesis environment
+* no physical FPGA re-validation
+* uncertainty method assumptions
+
+এটা weakness না; scholarly honesty।
+
+---
+
+# 48. IX. Conclusion
+
+শেষে:
+
+```text
+What we learned
++
+Why reliability matters
++
+What future work can do
+```
+
+Future work:
+
+```text
+Transformer
+LLM
+active learning
+uncertainty-guided DSE
+real synthesis-in-loop
+```
+
+---
+
+# 49. Exact experiment matrix
+
+এটা আমি master table হিসেবে রাখব:
+
+| Exp | Split            | Model             | Goal             |
+| --- | ---------------- | ----------------- | ---------------- |
+| E1  | Random           | Ridge/RF/XGB/MLP  | Baseline         |
+| E2  | Kernel-disjoint  | Same models       | Generalization   |
+| E3  | Repeated grouped | Same models       | Stability        |
+| E4  | Kernel-disjoint  | QRF               | Uncertainty      |
+| E5  | Kernel-disjoint  | Deep Ensemble     | Uncertainty      |
+| E6  | All splits       | QRF/Ensemble      | Calibration      |
+| E7  | All splits       | Uncertainty model | Risk-coverage    |
+| E8  | Kernel-disjoint  | Feature ablation  | Feature value    |
+| E9  | Kernel-disjoint  | Model ablation    | Method value     |
+| E10 | Optional         | QoR predictor     | Pareto filtering |
+
+এটাই তোমার entire experimental roadmap।
+
+---
+
+# 50. কোন result হলে paper strong হবে?
+
+Strong result-এর ideal pattern:
+
+```text
+Random split
+↓
+low error
+
+Kernel-disjoint
+↓
+higher error
+
+Higher error
+↓
+higher uncertainty
+
+High uncertainty
+↓
+higher actual error
+
+Reject uncertain predictions
+↓
+lower retained error
+```
+
+এটা হলে paper-এর research story খুব coherent হবে।
+
+কিন্তু যদি:
+
+```text
+uncertainty ≠ error
+```
+
+তাহলেও আমরা honest finding report করব। তখন contribution হবে uncertainty method-এর limitation analysis; false success claim করব না।
+
+---
+
+# 51. Hardware requirement
+
+তোমার core thesis-এর জন্য:
+
+```text
+FPGA board       ❌
+ASIC             ❌
+physical device  ❌
+Vitis HLS rerun  ❌ initially
+```
+
+Need:
+
+```text
+Python
+scikit-learn
+XGBoost
+PyTorch
+Pandas
+NumPy
+Matplotlib
+```
+
+তোমার existing **184,717-row JSON**-ই initial dataset।
+
+ForgeHLS raw `design_package` archives প্রায় 83 GB, কিন্তু stored design-level synthesis results JSON আলাদাভাবে available; তাই full raw archive initial study-তে দরকার নেই। ([Hugging Face][2])
+
+---
+
+# 52. Compute plan
+
+### Local Windows/Fedora
+
+```text
+Dataset audit
+Feature extraction
+RF
+XGBoost
+Grouped CV/splits
+```
+
+CPU sufficient হওয়ার কথা।
+
+### GPU / Colab
+
+শুধু:
+
+```text
+MLP
+Deep ensemble
+Transformer later
+```
+
+প্রয়োজনে।
+
+---
+
+# 53. Project folder
+
+তুমি ইতিমধ্যেই ঠিক structure বানিয়েছ:
+
+```text
+ForgeHLS/
+└── hls_ml/
+    ├── data/
+    ├── figures/
+    ├── notebooks/
+    ├── results/
+    └── scripts/
+```
+
+আমি পরে এগুলো আরও organize করব:
+
+```text
+scripts/
+├── dataset_audit.py
+├── kernel_group_audit.py
+├── source_normalization_audit.py
+├── pragma_audit.py
+├── feature_extractor.py
+├── build_dataset.py
+├── make_splits.py
+├── train_baselines.py
+├── train_uncertainty.py
+├── evaluate.py
+└── make_figures.py
+```
+
+এটা শেষে GitHub-ready reproducible repository হবে।
+
+---
+
+# 54. Thesis implementation-এর exact chronological order
+
+এটাই সবচেয়ে important part।
+
+### Phase 1 — DONE ✅
+
+```text
+ForgeHLS selected
+JSON downloaded
+184,717 records confirmed
+```
+
+### Phase 2 — DONE ✅
+
+```text
+dataset audit
+group audit
+source normalization audit
+```
+
+### Phase 3 — NOW
+
+```text
+pragma audit
+feature design
+feature extraction
+```
+
+### Phase 4
+
+```text
+X/y/group dataset build
+```
+
+### Phase 5
+
+```text
+random split
+RF baseline
+```
+
+### Phase 6
+
+```text
+kernel-disjoint split
+RF/XGB/MLP
+```
+
+### Phase 7
+
+```text
+uncertainty
+QRF
+Deep Ensemble
+```
+
+### Phase 8
+
+```text
+calibration
+risk-coverage
+selective prediction
+```
+
+### Phase 9
+
+```text
+ablation
+statistical analysis
+kernel-wise analysis
+```
+
+### Phase 10
+
+```text
+optional Pareto filtering
+```
+
+### Phase 11
+
+```text
+paper figures
+tables
+IEEE manuscript
+```
+
+---
+
+# 55. আমাদের paper-এর final conceptual diagram
+
+```text
+                     ForgeHLS
+                         │
+              184,717 real designs
+                         │
+                  Dataset Audit
+                         │
+             (source, algorithm)
+                         │
+                Logical Groups
+                         │
+          ┌──────────────┴──────────────┐
+          │                             │
+    Random Row Split             Kernel-Disjoint
+          │                             │
+          └──────────────┬──────────────┘
+                         │
+                 Feature Extraction
+                         │
+              ┌──────────┴──────────┐
+              │                     │
+         Pragma Features      Code Structure
+              │                     │
+              └──────────┬──────────┘
+                         │
+                  ML QoR Predictor
+                         │
+        ┌────────────────┼─────────────────┐
+        ↓                ↓                 ↓
+     Latency            LUT          DSP/FF/BRAM
+        │                │                 │
+        └────────────────┼─────────────────┘
+                         ↓
+               Uncertainty Estimation
+                         ↓
+                    Calibration
+                         ↓
+                Selective Prediction
+                         ↓
+          Reliability under Distribution Shift
+```
+
+---
+
+# 56. আমার final assessment
+
+**এই thesis এখন যথেষ্ট strong।**
+
+কারণ এটা:
+
+```text
+❌ ছোট 77-row dataset নয়
+❌ fake/dummy data নয়
+❌ synthetic graph নয়
+❌ FPGA board-dependent নয়
+❌ শুধু model accuracy competition নয়
+```
+
+বরং:
+
+```text
+✅ 184,717 real design records
+✅ 491 logical groups
+✅ real synthesis-derived QoR
+✅ kernel-level generalization
+✅ multi-objective regression
+✅ uncertainty
+✅ calibration
+✅ selective prediction
+✅ reproducible experiments
+```
+
+ForgeHLS নিজে large-scale HLS ML dataset এবং QoR downstream task হিসেবে প্রতিষ্ঠিত; HLSFactory-ও HLS ML-এর জন্য large design-space generation/synthesis/data aggregation framework দেয়। ([arXiv][1])
+
+আর current literature-এ recent DiffHLS, MailoHLS এবং HLS-Seek-এর মতো কাজ already QoR/generalization/Pareto/uncertainty-related directions cover করছে। তাই তোমার paper-এর strength হবে **carefully isolated reliability question**, not “we used a more fashionable model.” ([ResearchGate][4])
+
+## সবচেয়ে গুরুত্বপূর্ণ: আমরা এখন কোথায় দাঁড়িয়ে?
+
+তুমি এখন **feature audit-এর ঠিক আগে** আছো।
+
+অর্থাৎ পরের actual coding step হলো:
+
+```text
+pragma_audit.py
+       ↓
+feature set finalization
+       ↓
+feature_extractor.py
+       ↓
+X, y, group তৈরি
+       ↓
+first Random Forest baseline
+```
+
+**আমি এখন পর্যন্ত split বা model training শুরু না করাকে সঠিক মনে করছি।** কারণ dataset grouping এবং leakage structure আগে establish করা হয়েছে; এখন feature definition clean করে নিলে পরের সব experiment একই dataset protocol-এর ওপর reproducible হবে।
+
+[1]: https://arxiv.org/abs/2507.03255?utm_source=chatgpt.com "ForgeHLS: A Large-Scale, Open-Source Dataset for High-Level Synthesis"
+[2]: https://huggingface.co/datasets/zedongpeng/forgehls?utm_source=chatgpt.com "zedongpeng/forgehls · Datasets at Hugging Face"
+[3]: https://www.sciencedirect.com/science/article/pii/S221509862100210X?utm_source=chatgpt.com "Q-PIR: A quantile based Pareto iterative refinement approach for high-level synthesis - ScienceDirect"
+[4]: https://www.researchgate.net/publication/403750827_DiffHLS_Differential_Learning_for_High-Level_Synthesis_QoR_Prediction_with_GNNs_and_LLM_Code_Embeddings?utm_source=chatgpt.com "DiffHLS: Differential Learning for High-Level Synthesis QoR Prediction with GNNs and LLM Code Embeddings"
+[5]: https://arxiv.org/abs/2606.07246?utm_source=chatgpt.com "MailoHLS: Multi-Adapter Structure-Aware Learning for Pareto-Driven HLS Pragma Optimization"
+[6]: https://arxiv.org/abs/2605.13536?utm_source=chatgpt.com "HLS-Seek: QoR-Aware Code Generation for High-Level Synthesis via Proxy Comparative Reward Reinforcement Learning"
+[7]: https://arxiv.org/abs/2405.00820?utm_source=chatgpt.com "HLSFactory: A Framework Empowering High-Level Synthesis Datasets for Machine Learning and Beyond"
