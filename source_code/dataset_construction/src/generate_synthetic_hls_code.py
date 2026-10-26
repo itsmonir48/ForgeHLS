@@ -11,13 +11,12 @@ def query_gpt_n_times(prompt, n=1, model="chatgpt-4o-latest", temperature=0.2):
     # model="o1-mini",
     # model="o1-preview",
 
-    # openai_api_key = os.getenv('OPENAI_API_KEY')
-    openai_api_key = "sk-QpHUrsblHgB7kAzcpwLmrFz3yKKTiFVlFOW2vgVc7ARfqsXR"
+    openai_api_key = os.getenv("OPENAI_API_KEY")
     if openai_api_key:
         print("OpenAI API Key successfully retrieved.")
     else:
         print("Failed to retrieve OpenAI API Key.")
-    openai_api_base = "https://a.fe8.cn/v1"
+    openai_api_base = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
 
     client = OpenAI(api_key=openai_api_key, base_url=openai_api_base)
     messages = [

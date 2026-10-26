@@ -8,6 +8,6 @@ vllm serve \
     --port 8015 \
     --tensor-parallel-size $GPU_num \
     --dtype auto \
-    --api-key "token-abc123" \
+    --api-key "${VLLM_API_KEY:?Set VLLM_API_KEY before starting vLLM}" \
     --gpu_memory_utilization 0.9 \
     # --enable-prefix-caching

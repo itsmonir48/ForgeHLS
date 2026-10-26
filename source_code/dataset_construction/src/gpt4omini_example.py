@@ -4,13 +4,15 @@ from openai import OpenAI
 import os
 
 def query_gpt4omini(prompt):
-    # openai_api_key = os.getenv('OPENAI_API_KEY')
-    openai_api_key = ""
+    openai_api_key = os.getenv("OPENAI_API_KEY")
     if openai_api_key:
         print("OpenAI API Key has setup.")
     else:
         print("Failed to setup OpenAI API Key.")
-    openai_api_base = ""
+    openai_api_base = os.getenv("OPENAI_API_BASE", "https://api.openai.com/v1")
+
+    if not openai_api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set")
 
     client = OpenAI(api_key=openai_api_key, base_url=openai_api_base)
     messages = [

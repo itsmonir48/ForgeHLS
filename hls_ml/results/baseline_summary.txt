@@ -3,19 +3,19 @@ Baseline QoR Prediction & Distribution Shift Summary (E1, E2, E3)
 
 1. Hypothesis H1 & H2 Verification (Random vs Kernel-Disjoint):
 ---------------------------------------------------------------------------
-  * Ridge           : E1 R² = 0.093  -->  E2 R² = -865.257 | Average Error Degradation: 2.93x
-  * RandomForest    : E1 R² = 0.519  -->  E2 R² = -24.414 | Average Error Degradation: 3.52x
-  * GradientBoosting: E1 R² = 0.523  -->  E2 R² = -10.799 | Average Error Degradation: 2.22x
-  * MLP             : E1 R² = 0.211  -->  E2 R² = -290.028 | Average Error Degradation: 4.84x
+  * Ridge           : E1 R² = -0.049  -->  E2 R² = -1346.556 | Average Error Degradation: 18.47x
+  * RandomForest    : E1 R² = 0.499  -->  E2 R² = 0.085 | Average Error Degradation: 1.25x
+  * GradientBoosting: E1 R² = 0.370  -->  E2 R² = 0.131 | Average Error Degradation: 0.92x
+  * MLP             : E1 R² = 0.380  -->  E2 R² = -1161.384 | Average Error Degradation: 25.49x
 
   [VERIFICATION]:
-  - H1 CONFIRMED: E1 (Random Split) achieves high nominal accuracy due to kernel pragma-variant leakage.
-  - H2 CONFIRMED: E2 (Kernel-Disjoint) shows significant structural performance drop across all models.
+  - H1 SUPPORTED: the measured random-vs-grouped comparison is reported above.
+  - H2 NOT SUPPORTED: the measured random-vs-grouped comparison is reported above.
 
 2. E3 (Repeated Grouped 5 Seeds Stability - RandomForest):
 ---------------------------------------------------------------------------
-  * Worst-caseLatency : R² = -0.528 ± 1.778 | MAE = 4341366932.6 ± 2096380755.5
-  * LUT               : R² = -20.679 ± 21.875 | MAE = 49082.1 ± 3735.6
-  * DSP               : R² = -9.721 ± 13.197 | MAE = 470.1 ± 328.0
-  * FF                : R² = -5.813 ± 10.995 | MAE = 28935.1 ± 16058.6
-  * BRAM_18K          : R² = -27.988 ± 29.313 | MAE = 32.4 ± 21.2
+  * Worst-caseLatency : R² = -0.744 ± 2.060 | MAE = 4033923627.6 ± 2046943227.2
+  * LUT               : R² = -0.109 ± 0.135 | MAE = 17982.0 ± 5270.3
+  * DSP               : R² = -0.038 ± 0.070 | MAE = 149.9 ± 52.9
+  * FF                : R² = 0.000 ± 0.004 | MAE = 12564.9 ± 3349.7
+  * BRAM_18K          : R² = -0.033 ± 0.015 | MAE = 15.7 ± 22.1

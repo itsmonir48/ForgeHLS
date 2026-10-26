@@ -23,7 +23,7 @@ FACTOR_REGEX = re.compile(r"factor\s*=\s*(\d+)", re.IGNORECASE)
 
 # Pre-compiled Regex patterns for Structural Code Metrics
 COMMENT_BLOCK_REGEX = re.compile(r"/\*.*?\*/", re.DOTALL)
-COMMENT_LINE_REGEX = re.compile(r"//.*$")
+COMMENT_LINE_REGEX = re.compile(r"//.*$", re.MULTILINE)
 FOR_LOOP_REGEX = re.compile(r"\bfor\s*\(", re.IGNORECASE)
 WHILE_LOOP_REGEX = re.compile(r"\bwhile\s*\(", re.IGNORECASE)
 IF_BRANCH_REGEX = re.compile(r"\bif\s*\(", re.IGNORECASE)

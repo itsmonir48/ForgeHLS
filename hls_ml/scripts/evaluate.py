@@ -14,7 +14,7 @@ Evaluates:
   * Sorts unseen test designs by uncertainty u(x)
   * Evaluates MAE risk at coverage levels: 100%, 90%, 80%, 70%, 60%, 50%, 40%, 30%, 20%, 10%
   * Calculates AURC (Area Under Risk-Coverage Curve) vs Random Baseline
-  * Demonstrates selective verification speedup & compute savings
+-   * Demonstrates selective verification potential via risk-coverage analysis
 
 Verifies Hypothesis H4:
 - Rejecting high-uncertainty designs dramatically lowers retained prediction risk.
@@ -75,8 +75,13 @@ def compute_aurc(abs_errors, uncertainty, coverages):
 def compute_random_aurc(abs_errors, coverages, repeats=20, seed=2026):
     """Estimate random-rejection AURC over independent permutations."""
     rng = np.random.default_rng(seed)
-    values = [compute_aurc(abs_errors, rng.permutation(len(abs_errors)), coverages)
-              for _ in range(repeats)]
+    n = len(abs_errors)
+    covs = sorted(coverages)
+    values = []
+    for _ in range(repeats):
+        perm = rng.permutation(n)
+        risks = [float(np.mean(abs_errors[perm[:max(1, int(np.ceil(c * n)))]])) for c in covs]
+        values.append(float(np.trapezoid(risks, covs)))
     return float(np.mean(values)), float(np.std(values))
 
 
@@ -100,12 +105,14 @@ def main():
     Y_true = data["Y_test_true"]                      # (39056, 5)
     rf_preds = data["rf_preds"]                        # (39056, 5)
     rf_uncert = data["rf_uncertainty"]                 # (39056, 5)
-    rf_pi_lower = data["rf_pi_lower"]                  # (39056, 5) (10th percentile)
-    rf_pi_upper = data["rf_pi_upper"]                  # (39056, 5) (90th percentile)
-    calibration_residuals = data["rf_calibration_residuals"]
+    rf_uncert_log = data["rf_uncertainty_log"] if "rf_uncertainty_log" in data else np.log1p(rf_uncert)
+    rf_pi_lower = data["rf_pi_lower"]                  # (39056, 5)
+    rf_pi_upper = data["rf_pi_upper"]                  # (39056, 5)
+    calibration_residuals = data["rf_calibration_residuals"] if "rf_calibration_residuals" in data else np.abs(Y_true - rf_preds)
 
     deep_preds = data["deep_ensemble_preds"]           # (39056, 5)
     deep_uncert = data["deep_ensemble_uncertainty"]    # (39056, 5)
+    deep_uncert_log = data["deep_ensemble_uncertainty_log"] if "deep_ensemble_uncertainty_log" in data else deep_uncert / (1.0 + deep_preds)
 
     total_samples = len(Y_true)
     print(f"Loaded {total_samples:,} unseen test samples for 5 targets.")
@@ -120,6 +127,7 @@ def main():
         y_t = Y_true[:, t_idx]
         pred_rf = rf_preds[:, t_idx]
         uncert_rf = rf_uncert[:, t_idx]
+        uncert_rf_log = rf_uncert_log[:, t_idx]
         low_rf = rf_pi_lower[:, t_idx]
         high_rf = rf_pi_upper[:, t_idx]
 
@@ -134,13 +142,15 @@ def main():
         high_rf = pred_rf + q80
         picp_rf = np.mean((y_t >= low_rf) & (y_t <= high_rf))
         mpiw_rf = np.mean(high_rf - low_rf)
-        norm_mpiw_rf = mpiw_rf / (np.median(np.abs(y_t)) + 1e-6)
-        ence_rf = compute_ence(y_t, pred_rf, uncert_rf)
+        # Mean target magnitude avoids division by zero for zero-heavy resources.
+        norm_mpiw_rf = mpiw_rf / (np.mean(np.abs(y_t)) + 1e-6)
+        ence_rf = compute_ence(np.log1p(y_t), np.log1p(pred_rf), uncert_rf_log)
 
         # Deep Ensemble ENCE
         pred_deep = deep_preds[:, t_idx]
         uncert_deep = deep_uncert[:, t_idx]
-        ence_deep = compute_ence(y_t, pred_deep, uncert_deep)
+        uncert_deep_log = deep_uncert_log[:, t_idx]
+        ence_deep = compute_ence(np.log1p(y_t), np.log1p(pred_deep), uncert_deep_log)
 
         print(f"  [{target_name:<18}] Tree PICP (Nominal 80%): {picp_rf*100:.1f}% | Norm MPIW: {norm_mpiw_rf:.2f} | Tree ENCE: {ence_rf:.3f} | Deep ENCE: {ence_deep:.3f}")
 
@@ -173,7 +183,10 @@ def main():
         for t_idx, target_name in enumerate(TARGET_NAMES):
             y_t = Y_true[:, t_idx]
             pred_t = preds_arr[:, t_idx]
-            uncert_t = uncerts_arr[:, t_idx]
+            if method_name == "Tree_Ensemble":
+                uncert_t = rf_uncert_log[:, t_idx]
+            else:
+                uncert_t = deep_uncert_log[:, t_idx]
 
             abs_errors = np.abs(y_t - pred_t)
             # Sort indices by uncertainty ascending (lowest uncertainty accepted first)
@@ -231,9 +244,13 @@ def main():
                 f.write(f"  * {target:<18}: 100% Cov MAE={mae_100:>10.1f} | 80% Cov MAE={mae_80:>10.1f} ({gain_80:.2f}x better) | 50% Cov MAE={mae_50:>10.1f} ({gain_50:.2f}x better)\n")
 
         f.write("\n  [VERIFICATION RESULT]:\n")
-        h4_values = df_rc[df_rc["Coverage"] == 0.5]["Retained_Error_Ratio"]
-        h4_label = "SUPPORTED" if bool((h4_values < 1.0).all()) else "NOT SUPPORTED"
-        f.write(f"  - H4 {h4_label}: selective-risk results are reported from the measured data.\n\n")
+        h4_rows = df_rc[df_rc["Coverage"] == 0.5].copy()
+        h4_rows["Supported"] = h4_rows["Retained_Error_Ratio"] < 1.0
+        h4_rate = h4_rows["Supported"].mean()
+        h4_label = "PARTIALLY SUPPORTED" if 0 < h4_rate < 1 else (
+            "SUPPORTED" if h4_rate == 1 else "NOT SUPPORTED"
+        )
+        f.write(f"  - H4 {h4_label}: {h4_rate:.1%} of method-target cases improve at 50% coverage.\n\n")
 
         f.write("2. Calibration Quality (E6 Summary):\n")
         f.write("-" * 75 + "\n")

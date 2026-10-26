@@ -26,6 +26,9 @@ FIGURES_DIR.mkdir(parents=True, exist_ok=True)
 
 # Raw dataset JSON path (supports environment variable override)
 DEFAULT_RAW_PATH = PROJECT_ROOT / "data" / "data_of_designs_forgehls.json"
+ALT_RAW_PATH = PROJECT_ROOT.parent / "dataset" / "data_of_designs_forgehls.json"
+if not DEFAULT_RAW_PATH.exists() and ALT_RAW_PATH.exists():
+    DEFAULT_RAW_PATH = ALT_RAW_PATH
 RAW_DATASET_PATH = Path(os.environ.get("FORGEHLS_DATA_PATH", str(DEFAULT_RAW_PATH)))
 
 # Pipeline Constants

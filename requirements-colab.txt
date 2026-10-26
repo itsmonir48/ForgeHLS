@@ -1,0 +1,5 @@
+-r requirements.txt
+
+# Colab normally provides a compatible PyTorch build. Install torch there only
+# if the runtime does not already provide it.
+torch>=2.2,<3

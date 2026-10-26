@@ -65,9 +65,9 @@
 | **E1** | Random Row Split (80/20) | Ridge, RF, XGBoost, MLP | Baseline optimistic performance |
 | **E2** | Kernel-Disjoint (LKO) | Ridge, RF, XGBoost, MLP | Generalization under kernel shift |
 | **E3** | Repeated Grouped Split (5 seeds) | Best models | Statistical stability (mean ± std) |
-| **E4** | Kernel-Disjoint | Quantile Regression Forest (QRF) | Prediction interval & epistemic UQ |
+| **E4** | Kernel-Disjoint | Tree-Ensemble Disagreement UQ | Prediction interval & epistemic UQ |
 | **E5** | Kernel-Disjoint | Deep Ensemble (MLP $\times$ 5) | Multi-model variance UQ |
-| **E6** | All Splits | QRF & Deep Ensemble | Calibration analysis (PICP, ENCE) |
+| **E6** | All Splits | Tree-Ensemble & Deep Ensemble | Calibration analysis (PICP, ENCE) |
 | **E7** | All Splits | Uncertainty Predictors | Selective prediction & Risk-Coverage (AURC) |
 | **E8** | Kernel-Disjoint | RF / XGBoost | Feature ablation (Set A vs B vs C) |
 | **E9** | Kernel-Disjoint | Model Ablations | Nominal vs Calibrated Uncertainty |
@@ -91,7 +91,7 @@ hls_ml/
     ├── build_dataset.py               # [PHASE 4] Build tabular arrays and save metadata
     ├── make_splits.py                 # [PHASE 4] Generate random, group-disjoint, family splits
     ├── train_baselines.py             # [PHASE 5 & 6] Train Ridge, RF, XGBoost, MLP (E1, E2, E3)
-    ├── train_uncertainty.py           # [PHASE 7] Train QRF, Deep Ensemble (E4, E5)
+    ├── train_uncertainty.py           # [PHASE 7] Train Tree UQ, Deep Ensemble (E4, E5)
     ├── evaluate.py                    # [PHASE 8] Evaluate calibration, ENCE, Risk-Coverage
     ├── ablation_study.py              # [PHASE 9] Feature & model ablation
     └── make_figures.py                # [PHASE 11] Generate IEEE-ready publication charts

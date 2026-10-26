@@ -324,7 +324,7 @@ def full_dse(cpp_path: str, source_designs_dir: str):
     # if array_count > 0:
         for array in array_information:
             for dim in range(array['dimensions']):
-                line = array['size_per_dimension'][dim] + 1 #  +2可以防止换行大括号
+                line = array['line_per_dimension'][dim] + 1 # Insert after the declaration line.
                 # line = top_function_line + 1
                 current_dim = dim + 1 # 1-based 维度
                 leaf_nodes = [node for node in PreOrderIter(root_node) if node.is_leaf]

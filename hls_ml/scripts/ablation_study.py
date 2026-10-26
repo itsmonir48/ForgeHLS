@@ -20,7 +20,7 @@ import numpy as np
 import pandas as pd
 from scipy.stats import spearmanr
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_absolute_error, r2_score
+from sklearn.metrics import mean_absolute_error, median_absolute_error, r2_score
 
 from config import DATA_DIR, RESULTS_DIR, TARGET_NAMES
 
@@ -85,14 +85,17 @@ def main():
                 n_jobs=-1,
                 random_state=42
             )
-            rf.fit(X_train, y_train_t)
+            rf.fit(X_train, np.log1p(np.clip(y_train_t, 0, None)))
 
             # Test predictions
-            tree_preds = np.array([tree.predict(X_test) for tree in rf.estimators_])
+            tree_preds = np.expm1(np.array([tree.predict(X_test) for tree in rf.estimators_]))
+            tree_preds = np.clip(tree_preds, 0, None)
             pred_mean = np.mean(tree_preds, axis=0)
-            uncert_std = np.std(tree_preds, axis=0)
+            uncert_std = np.std(np.log1p(tree_preds), axis=0)
 
             mae = mean_absolute_error(y_test_t, pred_mean)
+            median_ae = median_absolute_error(y_test_t, pred_mean)
+            log_mae = mean_absolute_error(np.log1p(y_test_t), np.log1p(pred_mean))
             r2 = r2_score(y_test_t, pred_mean)
 
             abs_err = np.abs(y_test_t - pred_mean)
@@ -107,6 +110,8 @@ def main():
                 "Target": target_name,
                 "R2": round(float(r2), 4),
                 "MAE": round(float(mae), 2),
+                "MedianAE": round(float(median_ae), 2),
+                "LogMAE": round(float(log_mae), 4),
                 "Spearman_rho": round(float(spearman_corr), 4),
                 "Mean_Uncertainty": round(float(np.mean(uncert_std)), 2)
             })
@@ -133,10 +138,8 @@ def main():
 
         f.write("Key Ablation Findings:\n")
         f.write("-" * 75 + "\n")
-        f.write("- Feature Set B (Pragma-Aware) provides dramatic improvements over Set A (Basic),\n")
-        f.write("  capturing loop unrolling factors, pipeline toggles, and array partition factors.\n")
-        f.write("- Feature Set C (Structural + Pragma) yields the highest uncertainty correlation\n")
-        f.write("  and best OOD generalization by capturing base C/C++ AST loop/branch complexity.\n")
+        f.write("- Feature-set conclusions must be drawn from the per-target metrics above;\n")
+        f.write("  no feature set is assumed to improve every target.\n")
 
     print(f"Saved executive summary report to: {summary_file}")
     print("\n" + "=" * 75)

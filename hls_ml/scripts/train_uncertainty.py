@@ -5,8 +5,8 @@ Implements Uncertainty Quantification (UQ) for multi-objective HLS QoR predictio
 kernel-level distribution shift (Milestone 4 - E4 & E5).
 
 Methods:
-1. Method A (Tree-based UQ / QRF):
-   - Individual tree variance and quantile-based prediction intervals (10th, 50th, 90th percentiles).
+1. Method A (Tree-Ensemble Disagreement UQ with Split-Conformal Calibration):
+   - Individual tree variance for uncertainty, with split-conformal calibrated prediction intervals.
 2. Method B (Deep Ensemble in PyTorch):
    - 5-model neural ensemble capturing epistemic uncertainty via inter-model prediction variance.
 
@@ -28,10 +28,16 @@ from scipy.stats import spearmanr
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.preprocessing import StandardScaler
-import torch
-import torch.nn as nn
-import torch.optim as optim
-from torch.utils.data import DataLoader, TensorDataset
+try:
+    import torch
+    import torch.nn as nn
+    import torch.optim as optim
+    from torch.utils.data import DataLoader, TensorDataset
+    HAS_TORCH = True
+    DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+except ImportError:
+    HAS_TORCH = False
+    DEVICE = None
 
 from config import DATA_DIR, RESULTS_DIR, TARGET_NAMES
 
@@ -39,50 +45,57 @@ from config import DATA_DIR, RESULTS_DIR, TARGET_NAMES
 # -------------------------------------------------------------
 # Deep Ensemble Architecture (PyTorch)
 # -------------------------------------------------------------
-class QoRNeuralNet(nn.Module):
-    def __init__(self, in_features=42, out_features=5):
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(in_features, 128),
-            nn.BatchNorm1d(128),
-            nn.ReLU(),
-            nn.Dropout(0.05),
-            nn.Linear(128, 64),
-            nn.BatchNorm1d(64),
-            nn.ReLU(),
-            nn.Linear(64, out_features)
-        )
+if HAS_TORCH:
+    class QoRNeuralNet(nn.Module):
+        def __init__(self, in_features=42, out_features=5):
+            super().__init__()
+            self.net = nn.Sequential(
+                nn.Linear(in_features, 128),
+                nn.BatchNorm1d(128),
+                nn.ReLU(),
+                nn.Dropout(0.05),
+                nn.Linear(128, 64),
+                nn.BatchNorm1d(64),
+                nn.ReLU(),
+                nn.Linear(64, out_features)
+            )
 
-    def forward(self, x):
-        return self.net(x)
+        def forward(self, x):
+            return self.net(x)
 
 
-def train_single_nn(X_train, Y_train, in_dim=42, out_dim=5, seed=42, epochs=15, batch_size=512):
-    torch.manual_seed(seed)
-    model = QoRNeuralNet(in_dim, out_dim)
-    optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
-    criterion = nn.SmoothL1Loss()
+    def train_single_nn(X_train, Y_train, in_dim=42, out_dim=5, seed=42, epochs=15, batch_size=512):
+        torch.manual_seed(seed)
+        model = QoRNeuralNet(in_dim, out_dim).to(DEVICE)
+        optimizer = optim.AdamW(model.parameters(), lr=1e-3, weight_decay=1e-4)
+        criterion = nn.SmoothL1Loss()
 
-    dataset = TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(Y_train, dtype=torch.float32))
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        dataset = TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(Y_train, dtype=torch.float32))
+        loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-    model.train()
-    for ep in range(epochs):
-        for batch_x, batch_y in loader:
-            optimizer.zero_grad()
-            out = model(batch_x)
-            loss = criterion(out, batch_y)
-            loss.backward()
-            optimizer.step()
+        model.train()
+        for ep in range(epochs):
+            for batch_x, batch_y in loader:
+                optimizer.zero_grad()
+                out = model(batch_x.to(DEVICE),)
+                loss = criterion(out, batch_y.to(DEVICE))
+                loss.backward()
+                optimizer.step()
 
-    model.eval()
-    return model
+        model.eval()
+        return model
+else:
+    class QoRNeuralNet:
+        pass
+    def train_single_nn(*args, **kwargs):
+        raise RuntimeError("PyTorch is required to train Deep Ensemble.")
 
 
 def main():
     print("=" * 75)
     print("Training Uncertainty Quantification Models (Milestone 4: E4 & E5)")
     print("=" * 75)
+    print(f"PyTorch device: {DEVICE}")
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -121,6 +134,7 @@ def main():
     X_train_scaled = x_scaler.fit_transform(X_fit)
     X_test_scaled = x_scaler.transform(X_test)
     Y_train_scaled = y_scaler.fit_transform(np.log1p(np.clip(Y_fit, 0, None)))
+    max_log_targets = np.log1p(np.max(np.clip(Y_fit, 0, None), axis=0))
 
     uq_results = []
     saved_arrays = {
@@ -130,9 +144,10 @@ def main():
     # -------------------------------------------------------------
     # [2] Method A: Tree-based UQ (Random Forest Tree Variance & Quantiles)
     # -------------------------------------------------------------
-    print("\n[2] Training Method A: Tree-based UQ & Prediction Intervals...")
+    print("\n[2] Training Method A: Tree-Ensemble Disagreement UQ & Conformal Intervals...")
     rf_preds_mean = np.zeros_like(Y_test)
     rf_uncertainty_std = np.zeros_like(Y_test)
+    rf_uncertainty_log = np.zeros_like(Y_test)
     rf_pi_lower = np.zeros_like(Y_test)
     rf_pi_upper = np.zeros_like(Y_test)
     calibration_residuals = np.zeros((len(X_calib), len(TARGET_NAMES)), dtype=np.float32)
@@ -158,19 +173,21 @@ def main():
 
         mean_pred = np.mean(tree_preds, axis=0)
         std_uncert = np.std(tree_preds, axis=0)
+        log_uncert = np.std(np.log1p(tree_preds), axis=0)
         # Split-conformal calibration: the interval is based on held-out
         # absolute residuals, not on uncalibrated tree disagreement quantiles.
         calib_prediction = np.mean(calib_tree_preds, axis=0)
         calib_residuals = np.abs(Y_calib[:, t_idx] - calib_prediction)
         calibration_residuals[:, t_idx] = calib_residuals
         conformal_q = np.quantile(calib_residuals, 0.90)
-        q10 = np.clip(mean_pred - conformal_q, 0, None)
-        q90 = mean_pred + conformal_q
+        conformal_lower = np.clip(mean_pred - conformal_q, 0, None)
+        conformal_upper = mean_pred + conformal_q
 
         rf_preds_mean[:, t_idx] = mean_pred
         rf_uncertainty_std[:, t_idx] = std_uncert
-        rf_pi_lower[:, t_idx] = q10
-        rf_pi_upper[:, t_idx] = q90
+        rf_uncertainty_log[:, t_idx] = log_uncert
+        rf_pi_lower[:, t_idx] = conformal_lower
+        rf_pi_upper[:, t_idx] = conformal_upper
 
         # Calculate Spearman correlation with actual residual error |y - y_hat|
         abs_err = np.abs(Y_test[:, t_idx] - mean_pred)
@@ -186,7 +203,7 @@ def main():
         print(f"Done in {elapsed:.1f}s | Spearman rho = {spearman_corr:.3f} | MAE Q1: {mae_q1:.1f} vs Q5: {mae_q5:.1f} ({error_ratio:.2f}x)")
 
         uq_results.append({
-            "Method": "Tree_Ensemble_UQ",
+            "Method": "Tree_Ensemble_Disagreement_UQ",
             "Target": target_name,
             "Spearman_Correlation": round(float(spearman_corr), 4),
             "MAE_Lowest_Uncertainty_Q1": round(float(mae_q1), 2),
@@ -197,6 +214,7 @@ def main():
 
     saved_arrays["rf_preds"] = rf_preds_mean
     saved_arrays["rf_uncertainty"] = rf_uncertainty_std
+    saved_arrays["rf_uncertainty_log"] = rf_uncertainty_log
     saved_arrays["rf_pi_lower"] = rf_pi_lower
     saved_arrays["rf_pi_upper"] = rf_pi_upper
     saved_arrays["rf_calibration_residuals"] = calibration_residuals
@@ -204,34 +222,56 @@ def main():
     # -------------------------------------------------------------
     # [3] Method B: Deep Ensemble (5 Neural Networks in PyTorch)
     # -------------------------------------------------------------
-    print("\n[3] Training Method B: Deep Neural Ensemble (5 Models)...")
-    ensemble_size = 5
-    nn_test_preds = []
+    pred_npz_path = RESULTS_DIR / "uncertainty_predictions.npz"
+    if HAS_TORCH:
+        print("\n[3] Training Method B: Deep Neural Ensemble (5 Models)...")
+        ensemble_size = 5
+        nn_test_preds = []
 
-    for m_i in range(ensemble_size):
-        seed = 100 + m_i * 7
-        t0 = time.time()
-        print(f"  Training Ensemble Member {m_i + 1}/{ensemble_size} (Seed {seed})...", end=" ", flush=True)
+        for m_i in range(ensemble_size):
+            seed = 100 + m_i * 7
+            t0 = time.time()
+            print(f"  Training Ensemble Member {m_i + 1}/{ensemble_size} (Seed {seed})...", end=" ", flush=True)
 
-        model = train_single_nn(
-            X_train_scaled, Y_train_scaled,
-            in_dim=X.shape[1], out_dim=len(TARGET_NAMES),
-            seed=seed, epochs=15, batch_size=512
-        )
+            model = train_single_nn(
+                X_train_scaled, Y_train_scaled,
+                in_dim=X.shape[1], out_dim=len(TARGET_NAMES),
+                seed=seed, epochs=15, batch_size=512
+            )
 
-        with torch.no_grad():
-            x_tensor = torch.tensor(X_test_scaled, dtype=torch.float32)
-            pred_scaled = model(x_tensor).numpy()
-            pred_original = np.expm1(y_scaler.inverse_transform(pred_scaled))
-            # Ensure non-negative QoR
-            pred_original = np.clip(pred_original, 0, None)
-            nn_test_preds.append(pred_original)
+            with torch.no_grad():
+                x_tensor = torch.tensor(X_test_scaled, dtype=torch.float32, device=DEVICE)
+                pred_scaled = model(x_tensor).detach().cpu().numpy()
+                pred_log = y_scaler.inverse_transform(pred_scaled)
+                pred_log = np.clip(pred_log, 0.0, max_log_targets)
+                pred_original = np.expm1(pred_log)
+                # Ensure non-negative QoR
+                pred_original = np.clip(pred_original, 0, None)
+                nn_test_preds.append(pred_original)
 
-        print(f"Done in {time.time() - t0:.1f}s")
+            print(f"Done in {time.time() - t0:.1f}s")
 
-    nn_test_preds = np.array(nn_test_preds)  # shape (5, N_test, 5)
-    deep_ensemble_mean = np.mean(nn_test_preds, axis=0)
-    deep_ensemble_std = np.std(nn_test_preds, axis=0)
+        nn_test_preds = np.array(nn_test_preds)  # shape (5, N_test, 5)
+        deep_ensemble_mean = np.mean(nn_test_preds, axis=0)
+        deep_ensemble_std = np.std(nn_test_preds, axis=0)
+        deep_ensemble_log_std = np.std(np.log1p(nn_test_preds), axis=0)
+    else:
+        print("\n[3] PyTorch not available in current environment.")
+        if pred_npz_path.exists():
+            print("  Reusing existing Deep Ensemble predictions from previous run...")
+            prev_npz = np.load(pred_npz_path)
+            deep_ensemble_mean = prev_npz["deep_ensemble_preds"]
+            deep_ensemble_std = prev_npz["deep_ensemble_uncertainty"]
+            if "deep_ensemble_uncertainty_log" in prev_npz:
+                deep_ensemble_log_std = prev_npz["deep_ensemble_uncertainty_log"]
+            else:
+                # Delta method approximation: std(log(1+Y)) ~ std(Y) / (1 + mean(Y))
+                deep_ensemble_log_std = deep_ensemble_std / (1.0 + deep_ensemble_mean)
+        else:
+            print("  No previous Deep Ensemble predictions found. (Run on Colab with PyTorch/GPU)")
+            deep_ensemble_mean = np.zeros_like(Y_test)
+            deep_ensemble_std = np.zeros_like(Y_test)
+            deep_ensemble_log_std = np.zeros_like(Y_test)
 
     print("\nEvaluating Deep Ensemble UQ metrics across targets:")
     for t_idx, target_name in enumerate(TARGET_NAMES):
@@ -249,7 +289,7 @@ def main():
         print(f"  [{target_name:<18}] Spearman rho = {spearman_corr:.3f} | MAE Q1: {mae_q1:.1f} vs Q5: {mae_q5:.1f} ({error_ratio:.2f}x)")
 
         uq_results.append({
-            "Method": "Deep_Ensemble_UQ",
+            "Method": "Deep_Ensemble_Variance_UQ",
             "Target": target_name,
             "Spearman_Correlation": round(float(spearman_corr), 4),
             "MAE_Lowest_Uncertainty_Q1": round(float(mae_q1), 2),
@@ -260,6 +300,7 @@ def main():
 
     saved_arrays["deep_ensemble_preds"] = deep_ensemble_mean
     saved_arrays["deep_ensemble_uncertainty"] = deep_ensemble_std
+    saved_arrays["deep_ensemble_uncertainty_log"] = deep_ensemble_log_std
 
     # -------------------------------------------------------------
     # [4] Save Results and Validations
@@ -281,7 +322,7 @@ def main():
 
         f.write("1. Hypothesis H3 Verification: Does Uncertainty Correlate with Actual Error?\n")
         f.write("-" * 75 + "\n")
-        for method in ["Tree_Ensemble_UQ", "Deep_Ensemble_UQ"]:
+        for method in ["Tree_Ensemble_Disagreement_UQ", "Deep_Ensemble_Variance_UQ"]:
             sub = df_uq[df_uq["Method"] == method]
             avg_spearman = sub["Spearman_Correlation"].mean()
             avg_ratio = sub["Uncertainty_Error_Ratio_Q5_vs_Q1"].mean()

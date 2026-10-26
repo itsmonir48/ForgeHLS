@@ -4,6 +4,8 @@ import json
 import random
 from datetime import datetime
 
+random.seed(42)
+
 def extract_code(source_code_array):
     """从source_code数组中提取代码内容"""
     if not source_code_array or not isinstance(source_code_array, list):
@@ -162,7 +164,8 @@ def main():
             strategy_data.append((strategy, data_item))
         
         if valid_examples:
-            # 添加到训练或测试集
+            # Keep every strategy variant of a source/algorithm group together.
+            is_training = random.random() < 0.8
             for strategy, data_item in strategy_data:
                 if is_training:
                     training_data.append(data_item)

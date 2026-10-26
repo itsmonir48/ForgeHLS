@@ -49,8 +49,8 @@ async def process_prompts(client, prompts):
 def inference_with_lora_model(prompts, batch_size=1):
     client = LLMClient(
         model_name="HLS_model",
-        api_key="token-abc123",
-        base_url="http://localhost:8015/v1"
+        api_key=os.environ.get("VLLM_API_KEY", ""),
+        base_url=os.environ.get("VLLM_BASE_URL", "http://localhost:8015/v1")
     )
     
     # 只创建一次事件循环，处理所有提示

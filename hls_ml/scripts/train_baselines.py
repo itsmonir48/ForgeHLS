@@ -69,14 +69,18 @@ def fit_predict(model_name, X, y, train_idx, test_idx, seed):
         X_train, X_test = X[train_idx], X[test_idx]
 
     model = get_model(model_name, seed=seed)
-    model.fit(X_train, np.log1p(np.clip(y[train_idx], 0, None)))
-    return np.clip(np.expm1(model.predict(X_test)), 0, None)
+    y_train = np.clip(y[train_idx], 0, None)
+    model.fit(X_train, np.log1p(y_train))
+    log_prediction = np.asarray(model.predict(X_test), dtype=np.float64)
+    max_log_target = np.log1p(np.max(y_train))
+    log_prediction = np.clip(log_prediction, 0.0, max_log_target)
+    return np.expm1(log_prediction)
 
 
 def get_model(model_name, seed=42):
     """Factory for baseline models."""
     if model_name == "Ridge":
-        return Ridge(alpha=1.0, random_state=seed)
+        return Ridge(alpha=10.0, solver="lsqr", random_state=seed)
     elif model_name == "RandomForest":
         # Fast & strong ensemble
         return RandomForestRegressor(
