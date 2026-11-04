@@ -7,9 +7,10 @@ Figures Generated in hls_ml/figures/:
 1. fig1_distribution_shift_e1_vs_e2.png
    - Bar chart showing nominal accuracy in E1 (Random Split) vs structural degradation in E2 (Kernel-Disjoint Split).
 2. fig2_uncertainty_correlation_quintiles.png
-   - Monotonic error explosion from Q1 (Lowest Uncertainty) to Q5 (Highest Uncertainty) across all 5 targets.
+   - Mean absolute error across uncertainty quintiles for the four resource targets.
 3. fig3_risk_coverage_curves.png
-   - Risk-Coverage curves showing the dramatic plunge in MAE as high-uncertainty designs are selectively abstained.
+   - Tree risk-coverage curves; BRAM error-reduction factors are omitted because
+     zero-valued retained errors make ratios unstable.
 4. fig4_feature_ablation.png
    - Comparison of Feature Set A (Basic), Set B (Pragma-aware), and Set C (Structural+Pragma).
 """
@@ -71,9 +72,10 @@ def plot_fig1_distribution_shift():
     ax.legend(frameon=True, facecolor="white", edgecolor="none")
     ax.grid(axis="y", linestyle="--", alpha=0.5)
 
-    # Annotate degradation factor on top of bars
+    # Annotate comparable NMAE degradation; raw MAE ratios are not comparable
+    # because E1 and E2 contain different test populations.
     for i, row in sub.reset_index().iterrows():
-        deg = row["MAE_Degradation_Ratio"]
+        deg = row["E2_NMAE"] / row["E1_NMAE"]
         y_pos = e2_nmaes[i] + 0.05 * max(e2_nmaes)
         ax.text(x[i] + width/2, y_pos, f"{deg:.1f}x", ha="center", va="bottom", fontsize=9, fontweight="bold", color="#d95f02")
 
@@ -124,7 +126,7 @@ def plot_fig2_uncertainty_quintiles():
         ax.set_ylabel("MAE")
         ax.grid(axis="y", linestyle="--", alpha=0.5)
 
-    fig.suptitle("Figure 2: Monotonic Error Growth Across Uncertainty Quintiles (H3 Verification)", fontsize=13, y=1.03)
+    fig.suptitle("Figure 2: Resource-Target Error Across Uncertainty Quintiles", fontsize=13, y=1.03)
     fig.tight_layout()
     out_path = FIGURES_DIR / "fig2_uncertainty_correlation_quintiles.png"
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
@@ -163,18 +165,18 @@ def plot_fig3_risk_coverage():
     # Right plot: Error Reduction Factor (Speedup / Accuracy Gain)
     ax2 = axes[1]
     for i, tgt in enumerate(TARGET_NAMES):
-        if tgt != "Worst-caseLatency":  # keep visual scale readable across resources
+        if tgt not in {"Worst-caseLatency", "BRAM_18K"}:
             tgt_df = sub[sub["Target"] == tgt].sort_values("Coverage")
             ax2.plot(tgt_df["Coverage"] * 100, tgt_df["Error_Reduction_Factor"], marker="s", label=f"{TARGET_DISPLAY[i]} Gain", color=palette[i])
 
     ax2.set_xlabel("Coverage (% Accepted Designs)")
-    ax2.set_ylabel("Accuracy Multiplier (x-times better)")
-    ax2.set_title("Error Reduction Factor via Abstention")
+    ax2.set_ylabel("Error Reduction Factor (×)")
+    ax2.set_title("Error Reduction for LUT, DSP, and FF")
     ax2.legend(frameon=True)
     ax2.grid(True, linestyle="--", alpha=0.5)
     ax2.set_xlim(10, 105)
 
-    fig.suptitle("Figure 3: Risk-Coverage Curves for Selective Synthesis (H4 Verification)", fontsize=13, y=1.02)
+    fig.suptitle("Figure 3: Tree-Ensemble Risk-Coverage Curves", fontsize=13, y=1.02)
     fig.tight_layout()
     out_path = FIGURES_DIR / "fig3_risk_coverage_curves.png"
     fig.savefig(out_path, dpi=300, bbox_inches="tight")
@@ -209,7 +211,7 @@ def plot_fig4_feature_ablation():
     ax.bar(x + width, r_c, width, label="Set C (Structural+Pragma: 42 features)", color="#1f78b4", alpha=0.9)
 
     ax.set_ylabel("Uncertainty Spearman Correlation (ρ)")
-    ax.set_title("Figure 4: Feature Set Ablation on Uncertainty Informative Quality (E8)")
+    ax.set_title("Figure 4: Feature-Set Ablation for Uncertainty--Error Ranking")
     ax.set_xticks(x)
     ax.set_xticklabels(TARGET_DISPLAY)
     ax.legend(loc="lower right", frameon=True)

@@ -52,11 +52,14 @@ def main():
 
     t_start = time.time()
     for i, row in enumerate(raw_data):
+        for field in ("source_name", "algo_name", "source_code"):
+            if field not in row or row[field] in (None, "", []):
+                raise ValueError(f"Record {i} is missing required field: {field}")
         feats = extract_features_from_record(row)
         targets = extract_targets_from_record(row)
 
-        source_name = str(row.get("source_name", "unknown"))
-        algo_name = str(row.get("algo_name", "unknown"))
+        source_name = str(row["source_name"])
+        algo_name = str(row["algo_name"])
         group_id = f"{source_name}::{algo_name}"
         is_pareto = bool(row.get("is_pareto", False))
 

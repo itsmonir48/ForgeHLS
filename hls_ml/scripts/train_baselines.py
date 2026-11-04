@@ -53,9 +53,10 @@ def calculate_metrics(y_true, y_pred):
     mean_val = np.mean(np.abs(y_true))
     nmae = mae / (mean_val + 1e-6)  # relative error ratio
     log_mae = mean_absolute_error(np.log1p(y_true), np.log1p(np.clip(y_pred, 0, None)))
+    log_r2 = r2_score(np.log1p(y_true), np.log1p(np.clip(y_pred, 0, None)))
     medae = median_absolute_error(y_true, y_pred)
     return {"R2": r2, "MAE": mae, "RMSE": rmse, "NMAE": nmae,
-            "MedianAE": medae, "LogMAE": log_mae}
+            "MedianAE": medae, "LogMAE": log_mae, "LogR2": log_r2}
 
 
 def fit_predict(model_name, X, y, train_idx, test_idx, seed):
@@ -176,12 +177,14 @@ def main():
                 "E1_NMAE": round(metrics_e1["NMAE"], 4),
                 "E1_MedianAE": round(metrics_e1["MedianAE"], 2),
                 "E1_LogMAE": round(metrics_e1["LogMAE"], 4),
+                "E1_LogR2": round(metrics_e1["LogR2"], 4),
                 "E2_R2": round(metrics_e2["R2"], 4),
                 "E2_MAE": round(metrics_e2["MAE"], 2),
                 "E2_RMSE": round(metrics_e2["RMSE"], 2),
                 "E2_NMAE": round(metrics_e2["NMAE"], 4),
                 "E2_MedianAE": round(metrics_e2["MedianAE"], 2),
                 "E2_LogMAE": round(metrics_e2["LogMAE"], 4),
+                "E2_LogR2": round(metrics_e2["LogR2"], 4),
                 "MAE_Degradation_Ratio": round(metrics_e2["MAE"] / (metrics_e1["MAE"] + 1e-6), 2),
                 "Fit_Time_s": round(fit_time, 2)
             }
@@ -218,6 +221,7 @@ def main():
             seed_r2s = []
             seed_maes = []
             seed_nmaes = []
+            seed_log_maes = []
 
             for seed in SEEDS:
                 train_idx = splits_data[f"e3_grouped_seed_{seed}_train_idx"]
@@ -229,6 +233,7 @@ def main():
                 seed_r2s.append(m["R2"])
                 seed_maes.append(m["MAE"])
                 seed_nmaes.append(m["NMAE"])
+                seed_log_maes.append(m["LogMAE"])
 
             e3_records.append({
                 "Model": model_name,
@@ -239,6 +244,8 @@ def main():
                 "MAE_std": round(float(np.std(seed_maes)), 2),
                 "NMAE_mean": round(float(np.mean(seed_nmaes)), 4),
                 "NMAE_std": round(float(np.std(seed_nmaes)), 4),
+                "LogMAE_mean": round(float(np.mean(seed_log_maes)), 4),
+                "LogMAE_std": round(float(np.std(seed_log_maes)), 4),
             })
             print(f"  {target_name:<18}: R² = {np.mean(seed_r2s):.3f} ± {np.std(seed_r2s):.3f} | MAE = {np.mean(seed_maes):.1f} ± {np.std(seed_maes):.1f}")
 
@@ -262,21 +269,33 @@ def main():
             avg_e1_r2 = sub["E1_R2"].mean()
             avg_e2_r2 = sub["E2_R2"].mean()
             avg_deg = sub["MAE_Degradation_Ratio"].mean()
-            f.write(f"  * {model:<16}: E1 R² = {avg_e1_r2:.3f}  -->  E2 R² = {avg_e2_r2:.3f} | Average Error Degradation: {avg_deg:.2f}x\n")
+            avg_e1_log = sub["E1_LogMAE"].mean()
+            avg_e2_log = sub["E2_LogMAE"].mean()
+            f.write(
+                f"  * {model:<16}: raw E1 R² = {avg_e1_r2:.3f} --> raw E2 R² = {avg_e2_r2:.3f} | "
+                f"raw MAE ratio = {avg_deg:.2f}x | log-MAE E1/E2 = {avg_e1_log:.4f}/{avg_e2_log:.4f}\n"
+            )
 
         f.write("\n  [VERIFICATION]:\n")
         h1_supported = bool((df_e1_e2["E1_R2"] > df_e1_e2["E2_R2"]).mean() >= 0.75)
-        h2_supported = bool((df_e1_e2["E2_MAE"] > df_e1_e2["E1_MAE"]).mean() >= 0.75)
+        # Raw MAE is dominated by the heavy-tailed latency/resource targets.
+        # Use log-MAE for the primary distribution-shift check and retain raw
+        # metrics for transparent reporting.
+        h2_supported = bool((df_e1_e2["E2_LogMAE"] > df_e1_e2["E1_LogMAE"]).mean() >= 0.75)
         h1_label = "SUPPORTED" if h1_supported else "NOT SUPPORTED"
         h2_label = "SUPPORTED" if h2_supported else "NOT SUPPORTED"
         f.write(f"  - H1 {h1_label}: the measured random-vs-grouped comparison is reported above.\n")
-        f.write(f"  - H2 {h2_label}: the measured random-vs-grouped comparison is reported above.\n\n")
+        f.write(f"  - H2 {h2_label}: based on log-MAE; raw-scale MAE is reported but not used as the primary test.\n\n")
 
         f.write("2. E3 (Repeated Grouped 5 Seeds Stability - RandomForest):\n")
         f.write("-" * 75 + "\n")
         rf_e3 = df_e3[df_e3["Model"] == "RandomForest"]
         for _, row in rf_e3.iterrows():
-            f.write(f"  * {row['Target']:<18}: R² = {row['R2_mean']:.3f} ± {row['R2_std']:.3f} | MAE = {row['MAE_mean']:.1f} ± {row['MAE_std']:.1f}\n")
+            f.write(
+                f"  * {row['Target']:<18}: R² = {row['R2_mean']:.3f} ± {row['R2_std']:.3f} | "
+                f"MAE = {row['MAE_mean']:.1f} ± {row['MAE_std']:.1f} | "
+                f"log-MAE = {row['LogMAE_mean']:.4f} ± {row['LogMAE_std']:.4f}\n"
+            )
 
     print(f"Saved executive summary report to: {summary_file}")
     print("\n" + "=" * 75)

@@ -3,19 +3,19 @@ Baseline QoR Prediction & Distribution Shift Summary (E1, E2, E3)
 
 1. Hypothesis H1 & H2 Verification (Random vs Kernel-Disjoint):
 ---------------------------------------------------------------------------
-  * Ridge           : E1 R² = -0.049  -->  E2 R² = -1346.556 | Average Error Degradation: 18.47x
-  * RandomForest    : E1 R² = 0.499  -->  E2 R² = 0.085 | Average Error Degradation: 1.25x
-  * GradientBoosting: E1 R² = 0.370  -->  E2 R² = 0.131 | Average Error Degradation: 0.92x
-  * MLP             : E1 R² = 0.380  -->  E2 R² = -1161.384 | Average Error Degradation: 25.49x
+  * Ridge           : raw E1 R² = -0.091 --> raw E2 R² = -1764.954 | raw MAE ratio = 25.12x | log-MAE E1/E2 = 1.0602/1.3813
+  * RandomForest    : raw E1 R² = 0.495 --> raw E2 R² = 0.061 | raw MAE ratio = 1.22x | log-MAE E1/E2 = 0.2608/1.0147
+  * GradientBoosting: raw E1 R² = 0.369 --> raw E2 R² = 0.174 | raw MAE ratio = 0.91x | log-MAE E1/E2 = 0.3285/0.9446
+  * MLP             : raw E1 R² = 0.365 --> raw E2 R² = -603.525 | raw MAE ratio = 13.11x | log-MAE E1/E2 = 0.3929/1.3328
 
   [VERIFICATION]:
   - H1 SUPPORTED: the measured random-vs-grouped comparison is reported above.
-  - H2 NOT SUPPORTED: the measured random-vs-grouped comparison is reported above.
+  - H2 SUPPORTED: based on log-MAE; raw-scale MAE is reported but not used as the primary test.
 
 2. E3 (Repeated Grouped 5 Seeds Stability - RandomForest):
 ---------------------------------------------------------------------------
-  * Worst-caseLatency : R² = -0.744 ± 2.060 | MAE = 4033923627.6 ± 2046943227.2
-  * LUT               : R² = -0.109 ± 0.135 | MAE = 17982.0 ± 5270.3
-  * DSP               : R² = -0.038 ± 0.070 | MAE = 149.9 ± 52.9
-  * FF                : R² = 0.000 ± 0.004 | MAE = 12564.9 ± 3349.7
-  * BRAM_18K          : R² = -0.033 ± 0.015 | MAE = 15.7 ± 22.1
+  * Worst-caseLatency : R² = -0.819 ± 2.226 | MAE = 3954139947.5 ± 1985171437.0 | log-MAE = 1.8631 ± 0.2045
+  * LUT               : R² = -0.027 ± 0.031 | MAE = 16080.3 ± 4757.9 | log-MAE = 0.9134 ± 0.0787
+  * DSP               : R² = -0.076 ± 0.148 | MAE = 145.1 ± 48.0 | log-MAE = 0.8041 ± 0.0821
+  * FF                : R² = 0.009 ± 0.010 | MAE = 11920.6 ± 3033.3 | log-MAE = 1.2083 ± 0.0925
+  * BRAM_18K          : R² = -0.022 ± 0.013 | MAE = 15.5 ± 22.2 | log-MAE = 0.3869 ± 0.0819

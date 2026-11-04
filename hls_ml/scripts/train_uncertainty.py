@@ -256,22 +256,11 @@ def main():
         deep_ensemble_std = np.std(nn_test_preds, axis=0)
         deep_ensemble_log_std = np.std(np.log1p(nn_test_preds), axis=0)
     else:
-        print("\n[3] PyTorch not available in current environment.")
-        if pred_npz_path.exists():
-            print("  Reusing existing Deep Ensemble predictions from previous run...")
-            prev_npz = np.load(pred_npz_path)
-            deep_ensemble_mean = prev_npz["deep_ensemble_preds"]
-            deep_ensemble_std = prev_npz["deep_ensemble_uncertainty"]
-            if "deep_ensemble_uncertainty_log" in prev_npz:
-                deep_ensemble_log_std = prev_npz["deep_ensemble_uncertainty_log"]
-            else:
-                # Delta method approximation: std(log(1+Y)) ~ std(Y) / (1 + mean(Y))
-                deep_ensemble_log_std = deep_ensemble_std / (1.0 + deep_ensemble_mean)
-        else:
-            print("  No previous Deep Ensemble predictions found. (Run on Colab with PyTorch/GPU)")
-            deep_ensemble_mean = np.zeros_like(Y_test)
-            deep_ensemble_std = np.zeros_like(Y_test)
-            deep_ensemble_log_std = np.zeros_like(Y_test)
+        raise RuntimeError(
+            "PyTorch is required for a fresh uncertainty run. "
+            "Refusing to reuse stale Deep Ensemble artifacts; install the "
+            "requirements-colab.txt dependency and rerun this script."
+        )
 
     print("\nEvaluating Deep Ensemble UQ metrics across targets:")
     for t_idx, target_name in enumerate(TARGET_NAMES):

@@ -12,6 +12,7 @@ Leakage prevention:
 """
 
 import re
+import math
 from typing import Dict, Any, List, Tuple
 
 # Pre-compiled Regex patterns for Pragma Extraction
@@ -100,6 +101,19 @@ TARGET_COLUMNS: List[str] = [
 ]
 
 
+def _required_float(row: Dict[str, Any], field: str) -> float:
+    """Read a required numeric field without silently manufacturing data."""
+    if field not in row or row[field] is None:
+        raise ValueError(f"Missing required numeric field: {field}")
+    try:
+        value = float(row[field])
+    except (ValueError, TypeError) as exc:
+        raise ValueError(f"Invalid numeric value for {field}: {row[field]!r}") from exc
+    if not math.isfinite(value):
+        raise ValueError(f"Non-finite numeric value for {field}: {value!r}")
+    return value
+
+
 def extract_features_from_record(row: Dict[str, Any]) -> Dict[str, float]:
     """
     Extracts all features (A, B, and C) from a single ForgeHLS design JSON record.
@@ -110,14 +124,16 @@ def extract_features_from_record(row: Dict[str, Any]) -> Dict[str, float]:
     # -------------------------------------------------------------
     # Feature Set A: Basic
     # -------------------------------------------------------------
-    feats["TargetClockPeriod"] = float(row.get("TargetClockPeriod", 10.0))
-    feats["code_length"] = float(row.get("code_length", 0.0))
-    feats["pragma_number"] = float(row.get("pragma_number", 0.0))
+    feats["TargetClockPeriod"] = _required_float(row, "TargetClockPeriod")
+    feats["code_length"] = _required_float(row, "code_length")
+    feats["pragma_number"] = _required_float(row, "pragma_number")
 
     # -------------------------------------------------------------
     # Extract Pragmas & Pre-process Source
     # -------------------------------------------------------------
-    source_code_items = row.get("source_code", [])
+    source_code_items = row.get("source_code")
+    if not isinstance(source_code_items, list) or not source_code_items:
+        raise ValueError("Missing or invalid required field: source_code")
     raw_texts = []
     
     # Initialize Pragma Counters
@@ -150,6 +166,8 @@ def extract_features_from_record(row: Dict[str, Any]) -> Dict[str, float]:
     clean_code_lines = []
 
     for item in source_code_items:
+        if not isinstance(item, dict):
+            raise ValueError("Invalid source_code entry; expected an object")
         content = item.get("file_content", "")
         if not content:
             continue
@@ -324,11 +342,4 @@ def extract_targets_from_record(row: Dict[str, Any]) -> Dict[str, float]:
     """
     Extracts the 5 QoR target variables from a design JSON record.
     """
-    targets = {}
-    for col in TARGET_COLUMNS:
-        val = row.get(col, 0.0)
-        try:
-            targets[col] = float(val)
-        except (ValueError, TypeError):
-            targets[col] = 0.0
-    return targets
+    return {col: _required_float(row, col) for col in TARGET_COLUMNS}
