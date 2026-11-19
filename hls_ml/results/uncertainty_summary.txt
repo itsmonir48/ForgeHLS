@@ -3,21 +3,21 @@ Uncertainty Quantification (UQ) Summary (Milestone 4 - E4 & E5)
 
 1. Hypothesis H3 Verification: Does Uncertainty Correlate with Actual Error?
 ---------------------------------------------------------------------------
-  * Tree_Ensemble_Disagreement_UQ: Mean Spearman rho = 0.925 | Q5/Q1 Error Ratio = 2666964.79x
-  * Deep_Ensemble_Variance_UQ: Mean Spearman rho = 0.765 | Q5/Q1 Error Ratio = 37.98x
+  * Tree_Ensemble_Disagreement_UQ: Mean Spearman rho = 0.898 | Q5/Q1 Error Ratio = 936.74x
+  * Deep_Ensemble_Variance_UQ: Mean Spearman rho = 0.837 | Q5/Q1 Error Ratio = 14729.58x
 
   [VERIFICATION RESULT]:
   - H3 SUPPORTED: uncertainty/error association is reported empirically; no claim is hard-coded.
 
 2. Per-Target Detailed Breakdown:
 ---------------------------------------------------------------------------
-  [Tree_Ensemble_Disagreement_UQ] Worst-caseLatency : Spearman rho = +0.951 | Q1=383.25 vs Q5=5109921526.93 (13333225.55x)
-  [Tree_Ensemble_Disagreement_UQ] LUT               : Spearman rho = +0.887 | Q1=141.76 vs Q5=94514.93 (666.7x)
-  [Tree_Ensemble_Disagreement_UQ] DSP               : Spearman rho = +0.905 | Q1=57.34 vs Q5=5505.71 (96.02x)
-  [Tree_Ensemble_Disagreement_UQ] FF                : Spearman rho = +0.907 | Q1=123.45 vs Q5=92593.25 (750.03x)
-  [Tree_Ensemble_Disagreement_UQ] BRAM_18K          : Spearman rho = +0.976 | Q1=1.41 vs Q5=120.53 (85.66x)
-  [Deep_Ensemble_Variance_UQ] Worst-caseLatency : Spearman rho = +0.748 | Q1=835054912.0 vs Q5=5907509248.0 (7.07x)
-  [Deep_Ensemble_Variance_UQ] LUT               : Spearman rho = +0.750 | Q1=2442.88 vs Q5=39561.14 (16.19x)
-  [Deep_Ensemble_Variance_UQ] DSP               : Spearman rho = +0.602 | Q1=24.9 vs Q5=365.04 (14.66x)
-  [Deep_Ensemble_Variance_UQ] FF                : Spearman rho = +0.821 | Q1=1241.01 vs Q5=46826.72 (37.73x)
-  [Deep_Ensemble_Variance_UQ] BRAM_18K          : Spearman rho = +0.904 | Q1=1.3 vs Q5=148.66 (114.25x)
+  [Tree_Ensemble_Disagreement_UQ] Worst-caseLatency : Spearman rho = +0.885 | Q1=82466958.89 vs Q5=3898758844.94 (47.28x)
+  [Tree_Ensemble_Disagreement_UQ] LUT               : Spearman rho = +0.870 | Q1=217.18 vs Q5=107970.55 (497.14x)
+  [Tree_Ensemble_Disagreement_UQ] DSP               : Spearman rho = +0.900 | Q1=73.09 vs Q5=5826.25 (79.72x)
+  [Tree_Ensemble_Disagreement_UQ] FF                : Spearman rho = +0.847 | Q1=200.98 vs Q5=267509.95 (1331.0x)
+  [Tree_Ensemble_Disagreement_UQ] BRAM_18K          : Spearman rho = +0.989 | Q1=0.02 vs Q5=68.18 (2728.57x)
+  [Deep_Ensemble_Variance_UQ] Worst-caseLatency : Spearman rho = +0.908 | Q1=3742313.5 vs Q5=2801799680.0 (748.68x)
+  [Deep_Ensemble_Variance_UQ] LUT               : Spearman rho = +0.710 | Q1=1343587.5 vs Q5=38384.97 (0.03x)
+  [Deep_Ensemble_Variance_UQ] DSP               : Spearman rho = +0.887 | Q1=0.14 vs Q5=10127.25 (72494.19x)
+  [Deep_Ensemble_Variance_UQ] FF                : Spearman rho = +0.713 | Q1=592018.25 vs Q5=50172.91 (0.08x)
+  [Deep_Ensemble_Variance_UQ] BRAM_18K          : Spearman rho = +0.966 | Q1=0.01 vs Q5=5.07 (404.93x)

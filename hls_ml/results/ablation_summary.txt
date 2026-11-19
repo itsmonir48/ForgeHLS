@@ -4,27 +4,27 @@ Feature Set Ablation Study Summary (Milestone 6 - E8)
 Target: Worst-caseLatency
   * Set_A_Basic             : MAE=2462535009.1 | R²=-15.903 | Spearman rho=0.314
   * Set_B_PragmaAware       : MAE=1410576959.2 | R²=-1.976 | Spearman rho=0.628
-  * Set_C_StructuralPragma  : MAE= 528172616.8 | R²=+0.681 | Spearman rho=0.761
+  * Set_C_StructuralPragma  : MAE= 535633125.9 | R²=+0.685 | Spearman rho=0.775
 
 Target: LUT
   * Set_A_Basic             : MAE=     19265.5 | R²=-0.207 | Spearman rho=0.519
   * Set_B_PragmaAware       : MAE=     25305.5 | R²=-10.144 | Spearman rho=0.481
-  * Set_C_StructuralPragma  : MAE=     33471.2 | R²=-11.643 | Spearman rho=0.628
+  * Set_C_StructuralPragma  : MAE=     17048.8 | R²=-0.168 | Spearman rho=0.659
 
 Target: DSP
   * Set_A_Basic             : MAE=        92.1 | R²=+0.053 | Spearman rho=0.521
   * Set_B_PragmaAware       : MAE=       107.6 | R²=-0.104 | Spearman rho=0.619
-  * Set_C_StructuralPragma  : MAE=       313.7 | R²=-15.064 | Spearman rho=0.832
+  * Set_C_StructuralPragma  : MAE=       393.7 | R²=-12.699 | Spearman rho=0.883
 
 Target: FF
   * Set_A_Basic             : MAE=     21570.5 | R²=-0.451 | Spearman rho=0.475
   * Set_B_PragmaAware       : MAE=     15620.1 | R²=-0.165 | Spearman rho=0.550
-  * Set_C_StructuralPragma  : MAE=     26283.6 | R²=-2.004 | Spearman rho=0.687
+  * Set_C_StructuralPragma  : MAE=     16202.9 | R²=-0.085 | Spearman rho=0.645
 
 Target: BRAM_18K
   * Set_A_Basic             : MAE=        72.0 | R²=-1255.238 | Spearman rho=0.751
   * Set_B_PragmaAware       : MAE=         2.7 | R²=+0.036 | Spearman rho=0.798
-  * Set_C_StructuralPragma  : MAE=         3.3 | R²=-0.097 | Spearman rho=0.922
+  * Set_C_StructuralPragma  : MAE=        14.9 | R²=-19.390 | Spearman rho=0.972
 
 Key Ablation Findings:
 ---------------------------------------------------------------------------

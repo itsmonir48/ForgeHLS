@@ -1,0 +1,9 @@
+Budgeted DSE proxy on held-out kernels (E3, 5 seeds, GB) -- ROW ORDER KEPT (leaky diagnostic)
+===========================================================================
+Kernels per seed with >= 30 variants; median true Pareto size 8
+Heuristic features: lat:pragma_max_unroll_factor, res:pragma_max_unroll_factor
+ Budget |  Recall model  heur.  random  oracle |    ADRS model  heur.  random  oracle | model>rand  model>heur (ties)
+     5% |  0.310±0.012  0.504   0.052   0.948 |  0.596±0.051  3.969   2.250   0.122 |     87.8%      15.9% (18.3%)
+    10% |  0.402±0.012  0.595   0.101   0.986 |  0.366±0.045  2.728   1.149   0.024 |     89.3%      18.0% (14.8%)
+    20% |  0.501±0.028  0.693   0.200   0.999 |  0.177±0.036  2.295   0.654   0.001 |     90.2%      19.8% (14.1%)
+Median ADRS over kernels (mean over seeds): 5%: model 0.213, heuristic 0.479, random 0.525, oracle 0.000; 10%: model 0.104, heuristic 0.237, random 0.318, oracle 0.000; 20%: model 0.060, heuristic 0.094, random 0.175, oracle 0.000

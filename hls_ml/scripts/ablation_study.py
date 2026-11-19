@@ -9,9 +9,13 @@ Executes Feature Ablation Study (Milestone 6 - E8):
 Under E2 (Kernel-Disjoint Leave-Kernel-Out) split across all 5 targets:
 Worst-caseLatency, LUT, DSP, FF, BRAM_18K.
 
+The same comparison is then repeated over the five E3 seeds.
+
 Outputs:
-- hls_ml/results/feature_ablation_results.csv
+- hls_ml/results/feature_ablation_results.csv (E2, single split)
 - hls_ml/results/ablation_summary.txt
+- hls_ml/results/feature_ablation_e3_by_seed.csv
+- hls_ml/results/feature_ablation_e3_summary.csv (mean and std over seeds)
 """
 
 import time
@@ -22,7 +26,7 @@ from scipy.stats import spearmanr
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, median_absolute_error, r2_score
 
-from config import DATA_DIR, RESULTS_DIR, TARGET_NAMES
+from config import DATA_DIR, RESULTS_DIR, TARGET_NAMES, SEEDS
 
 
 def main():
@@ -142,6 +146,51 @@ def main():
         f.write("  no feature set is assumed to improve every target.\n")
 
     print(f"Saved executive summary report to: {summary_file}")
+
+    # -------------------------------------------------------------
+    # [4] Repeat over the five E3 kernel-disjoint seeds
+    # -------------------------------------------------------------
+    print("\n[4] Repeating the ablation over the five E3 seeds...")
+    e3_records = []
+    for seed in SEEDS:
+        tr = splits_data[f"e3_grouped_seed_{seed}_train_idx"]
+        te = splits_data[f"e3_grouped_seed_{seed}_test_idx"]
+        for set_name, feat_indices, num_feats in feature_sets:
+            X_sub = X_all[:, feat_indices]
+            for t_idx, target_name in enumerate(TARGET_NAMES):
+                rf = RandomForestRegressor(
+                    n_estimators=30, max_depth=16, min_samples_split=10,
+                    n_jobs=-1, random_state=seed,
+                )
+                rf.fit(X_sub[tr], np.log1p(np.clip(Y_all[tr, t_idx], 0, None)))
+                tree_preds = np.clip(np.expm1(np.array(
+                    [tree.predict(X_sub[te]) for tree in rf.estimators_]
+                )), 0, None)
+                pred_mean = tree_preds.mean(axis=0)
+                y_te = Y_all[te, t_idx]
+                rho, _ = spearmanr(np.std(np.log1p(tree_preds), axis=0),
+                                   np.abs(y_te - pred_mean))
+                e3_records.append({
+                    "Seed": seed, "Feature_Set": set_name,
+                    "Num_Features": num_feats, "Target": target_name,
+                    "MAE": mean_absolute_error(y_te, pred_mean),
+                    "LogMAE": mean_absolute_error(np.log1p(y_te), np.log1p(pred_mean)),
+                    "Spearman_rho": rho,
+                })
+        print(f"  seed {seed} done", flush=True)
+
+    df_e3 = pd.DataFrame(e3_records)
+    df_e3.to_csv(RESULTS_DIR / "feature_ablation_e3_by_seed.csv", index=False)
+    summary_e3 = df_e3.groupby(["Feature_Set", "Num_Features", "Target"], as_index=False).agg(
+        LogMAE_mean=("LogMAE", "mean"),
+        LogMAE_std=("LogMAE", lambda v: float(np.std(v, ddof=0))),
+        MAE_mean=("MAE", "mean"),
+        Spearman_rho_mean=("Spearman_rho", "mean"),
+        Spearman_rho_std=("Spearman_rho", lambda v: float(np.std(v, ddof=0))),
+    )
+    summary_e3.to_csv(RESULTS_DIR / "feature_ablation_e3_summary.csv", index=False)
+    print(summary_e3.to_string(index=False))
+
     print("\n" + "=" * 75)
     print("Ablation study successfully completed!")
     print("=" * 75)
