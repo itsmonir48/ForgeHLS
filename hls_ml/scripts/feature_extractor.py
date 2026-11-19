@@ -4,8 +4,14 @@ feature_extractor.py
 Deterministic feature extraction module for ForgeHLS C/C++ designs.
 Extracts:
 - Feature Set A (Basic): TargetClockPeriod, code_length, pragma_number
-- Feature Set B (Pragma-Aware): Set A + 22 pragma-specific counts and maximum factors
+- Feature Set B (Pragma-Aware): Set A + 25 pragma-specific counts and maximum factors
 - Feature Set C (Structural + Pragma): Set B + 14 deterministic code-structure metrics
+
+Known properties of the released ForgeHLS data:
+- TargetClockPeriod is 10 ns for every record, so it carries no information.
+- RESOURCE and BIND_OP pragmas are counted in pragma_other_count.
+- code_pointer_deref_count counts every '*' and '->' (multiplication
+  included), so it is an asterisk/arrow count, not a true dereference count.
 
 Leakage prevention:
 - Excludes: source_name, algo_name, design_id, latency-resource-strategy, is_kernel
@@ -21,6 +27,7 @@ PRAGMA_HLS_REGEX = re.compile(
     re.IGNORECASE
 )
 FACTOR_REGEX = re.compile(r"factor\s*=\s*(\d+)", re.IGNORECASE)
+COMPLETE_UNROLL_FACTOR = 1024
 
 # Pre-compiled Regex patterns for Structural Code Metrics
 COMMENT_BLOCK_REGEX = re.compile(r"/\*.*?\*/", re.DOTALL)
@@ -193,7 +200,13 @@ def extract_features_from_record(row: Dict[str, Any]) -> Dict[str, float]:
                 elif directive == "UNROLL":
                     unroll_cnt += 1
                     factor_match = FACTOR_REGEX.search(rem)
-                    factor = int(factor_match.group(1)) if factor_match else 0
+                    # "#pragma HLS unroll" without factor= means a complete
+                    # unroll, the most aggressive setting. Encode it with a
+                    # sentinel above every explicit factor instead of 0.
+                    # (Every UNROLL pragma in the audited ForgeHLS release
+                    # carries an explicit factor, so this does not change
+                    # the released feature matrix.)
+                    factor = int(factor_match.group(1)) if factor_match else COMPLETE_UNROLL_FACTOR
                     if factor == 1:
                         unroll_f1 += 1
                     elif factor == 2:

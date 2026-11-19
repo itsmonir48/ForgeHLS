@@ -1,0 +1,86 @@
+Extra analyses for the paper
+===========================================================================
+[1] Dataset facts
+  Constant features: ['TargetClockPeriod']
+  Distinct (feature vector, kernel) pairs: 62,092 of 184,717 rows
+  Rows sharing their feature vector with another row of the same kernel: 151,577 (82.1%)
+  Latency  collision floor LogMAE=0.176 | between-kernel log-variance share=97.2% | zeros=0.0%
+  LUT      collision floor LogMAE=0.178 | between-kernel log-variance share=80.2% | zeros=0.0%
+  DSP      collision floor LogMAE=0.074 | between-kernel log-variance share=92.3% | zeros=55.8%
+  FF       collision floor LogMAE=0.230 | between-kernel log-variance share=84.3% | zeros=0.0%
+  BRAM     collision floor LogMAE=0.014 | between-kernel log-variance share=93.0% | zeros=86.5%
+
+[2] GB under random-row (E1) and kernel-disjoint (E3) splits, five seeds each
+[3] Within-kernel ranking and single-feature heuristic
+  seed 42 done
+  seed 43 done
+  seed 44 done
+  seed 45 done
+  seed 46 done
+  Target        E1 LogMAE      E3 LogMAE  Const E3  ratio  E1 R2   E3 R2   rho E1/E3  heur.  heuristic feature
+  Latency  0.435±0.003   1.594±0.181     3.385   3.67   0.94    0.35 0.77/0.76    0.56  pragma_max_unroll_factor
+  LUT      0.412±0.003   0.843±0.047     1.534   2.05   0.13    0.02 0.83/0.81    0.74  pragma_max_unroll_factor
+  DSP      0.222±0.001   0.708±0.083     1.278   3.19   0.05    0.01 0.61/0.53    0.41  pragma_max_unroll_factor
+  FF       0.533±0.002   1.126±0.056     2.059   2.11   0.08    0.01 0.70/0.66    0.62  pragma_max_unroll_factor
+  BRAM     0.047±0.001   0.425±0.066     0.302   9.07   0.78  -13.20 0.27/0.07    0.11  pragma_max_unroll_factor
+  Latency  GB vs constant (E3): +52.9% LogMAE
+  LUT      GB vs constant (E3): +45.0% LogMAE
+  DSP      GB vs constant (E3): +44.6% LogMAE
+  FF       GB vs constant (E3): +45.3% LogMAE
+  BRAM     GB vs constant (E3): -41.0% LogMAE
+
+[4] Alternative group definitions (GB LogMAE)
+  LOSO CHStone done
+  LOSO MachSuite done
+  LOSO PolyBench done
+  LOSO Vitis-HLS-Introductory-Examples-flatten done
+  LOSO hls_algorithms done
+  LOSO leetcode_hls_algorithms done
+  LOSO operators done
+  LOSO rosetta done
+  LOSO rtl_chip done
+  LOSO rtl_ip done
+  LOSO rtl_module done
+  Target    Const  Src-algo   Algo   LOSO  LOSO c.
+  Latency    3.38      1.59   1.76   2.18     2.42
+  LUT        1.53      0.84   0.80   0.86     1.62
+  DSP        1.28      0.71   0.83   1.11     1.71
+  FF         2.06      1.13   1.11   1.34     2.25
+  BRAM       0.30      0.43   0.34   0.29     0.34
+  LOSO worse than constant: CHStone / Latency: 10.36 vs 0.73
+  LOSO worse than constant: CHStone / BRAM: 1.79 vs 0.18
+  LOSO worse than constant: MachSuite / BRAM: 0.70 vs 0.43
+  LOSO worse than constant: PolyBench / BRAM: 0.29 vs 0.02
+  LOSO worse than constant: Vitis-HLS-Introductory-Examples-flatten / Latency: 3.77 vs 2.30
+  LOSO worse than constant: Vitis-HLS-Introductory-Examples-flatten / DSP: 2.01 vs 0.78
+  LOSO worse than constant: Vitis-HLS-Introductory-Examples-flatten / BRAM: 1.71 vs 1.20
+  LOSO worse than constant: hls_algorithms / BRAM: 0.45 vs 0.29
+  LOSO worse than constant: rtl_ip / DSP: 0.82 vs 0.00
+  LOSO worse than constant: rtl_ip / BRAM: 0.14 vs 0.00
+  LOSO worse than constant: rtl_module / BRAM: 0.11 vs 0.05
+
+[5] Uncertainty vs predicted magnitude (E2 test set)
+  Latency  rho(tree σ,err)=0.885 rho(deep σ,err)=0.908 rho(|ŷ|,err)=0.839 rho(σ,|ŷ|)=0.913 | within-decile=0.51 | tree beats |ŷ| in 99.5% | deep log ρ=+0.59 | Q5/Q1 log err=18.3 (5 bins)
+  LUT      rho(tree σ,err)=0.870 rho(deep σ,err)=0.710 rho(|ŷ|,err)=0.882 rho(σ,|ŷ|)=0.953 | within-decile=0.28 | tree beats |ŷ| in 12.0% | deep log ρ=+0.24 | Q5/Q1 log err=5.3 (5 bins)
+  DSP      rho(tree σ,err)=0.901 rho(deep σ,err)=0.887 rho(|ŷ|,err)=0.912 rho(σ,|ŷ|)=0.970 | within-decile=0.63 | tree beats |ŷ| in 32.0% | deep log ρ=+0.60 | Q5/Q1 log err=5.2 (3 bins)
+  FF       rho(tree σ,err)=0.847 rho(deep σ,err)=0.713 rho(|ŷ|,err)=0.855 rho(σ,|ŷ|)=0.957 | within-decile=0.37 | tree beats |ŷ| in 23.0% | deep log ρ=+0.29 | Q5/Q1 log err=6.3 (5 bins)
+  BRAM     rho(tree σ,err)=0.989 rho(deep σ,err)=0.966 rho(|ŷ|,err)=0.992 rho(σ,|ŷ|)=0.996 | within-decile=0.68 | tree beats |ŷ| in 5.5% | deep log ρ=+0.94 | Q5/Q1 log err=347.4 (3 bins)
+
+[6] AURC reduction vs random rejection (×, coverage 5%..100%)
+  Latency  raw_MAE  tree log σ=1.53 tree raw σ=3.63 |ŷ|=4.18 oracle=13.24 deep log σ=1.28
+  Latency  log_MAE  tree log σ=2.18 tree raw σ=2.39 |ŷ|=2.30 oracle=3.46 deep log σ=1.70
+  LUT      raw_MAE  tree log σ=3.29 tree raw σ=6.38 |ŷ|=7.25 oracle=11.74 deep log σ=0.32
+  LUT      log_MAE  tree log σ=1.69 tree raw σ=1.73 |ŷ|=1.65 oracle=2.34 deep log σ=0.97
+  DSP      raw_MAE  tree log σ=2.99 tree raw σ=16.86 |ŷ|=18.28 oracle=32.56 deep log σ=16.22
+  DSP      log_MAE  tree log σ=2.46 tree raw σ=2.88 |ŷ|=2.91 oracle=4.92 deep log σ=1.83
+  FF       raw_MAE  tree log σ=4.62 tree raw σ=8.64 |ŷ|=9.10 oracle=16.86 deep log σ=0.34
+  FF       log_MAE  tree log σ=1.61 tree raw σ=1.77 |ŷ|=1.67 oracle=2.43 deep log σ=1.10
+  BRAM     raw_MAE  tree log σ=15.08 tree raw σ=15.00 |ŷ|=15.17 oracle=22.17 deep log σ=5.17
+  BRAM     log_MAE  tree log σ=8.47 tree raw σ=8.41 |ŷ|=8.63 oracle=9.77 deep log σ=4.19
+  Deep log σ, Latency: retained MAE at 80% coverage = 1.14× full-coverage MAE
+  Deep log σ, LUT: retained MAE at 80% coverage = 1.23× full-coverage MAE
+  Deep log σ, DSP: retained MAE at 80% coverage = 0.03× full-coverage MAE
+  Deep log σ, FF: retained MAE at 80% coverage = 1.19× full-coverage MAE
+  Deep log σ, BRAM: retained MAE at 80% coverage = 0.23× full-coverage MAE
+
+Finished in 425s

@@ -63,7 +63,46 @@ def main():
     print("  Feature Set A:", {k: sample_feat[k] for k in FEATURES_A})
     print("  Sample Pragma Feats (Set B):", {k: sample_feat[k] for k in ["pragma_pipeline_enable", "pragma_unroll_count", "pragma_max_unroll_factor", "pragma_array_partition_cyclic"]})
     print("  Sample Structural Feats (Set C):", {k: sample_feat[k] for k in ["code_line_count", "code_function_count", "code_total_loop_count", "code_max_nesting_depth"]})
+    check_known_values()
     print("\nVerification 100% PASSED!")
+
+
+def check_known_values():
+    """Exact-value checks on a hand-written design, not just 'it runs'."""
+    code = "\n".join([
+        "void top(int a[64], int b[64]) {",
+        "#pragma HLS ARRAY_PARTITION variable=a cyclic factor=4",
+        "#pragma HLS ARRAY_PARTITION variable=b complete",
+        "  for (int i = 0; i < 64; i++) {",
+        "#pragma HLS PIPELINE II=1",
+        "#pragma HLS UNROLL factor=8",
+        "    b[i] = a[i] * 2;",
+        "  }",
+        "  for (int j = 0; j < 4; j++) {",
+        "#pragma HLS UNROLL",
+        "    b[j] += 1;",
+        "  }",
+        "}",
+    ])
+    row = {
+        "TargetClockPeriod": 10, "code_length": len(code), "pragma_number": 5,
+        "source_code": [{"file_content": code}],
+    }
+    f = extract_features_from_record(row)
+    expected = {
+        "pragma_pipeline_count": 1, "pragma_pipeline_enable": 1,
+        "pragma_unroll_count": 2, "pragma_unroll_factor_8": 1,
+        # factor-less UNROLL is a complete unroll: counted in the >=16 bucket
+        # and reported with the sentinel, never as factor 0.
+        "pragma_unroll_factor_16": 1, "pragma_max_unroll_factor": 1024,
+        "pragma_array_partition_count": 2, "pragma_array_partition_cyclic": 1,
+        "pragma_array_partition_complete": 1, "pragma_max_partition_factor": 4,
+        "code_for_loop_count": 2, "code_function_count": 1,
+    }
+    for key, value in expected.items():
+        assert f[key] == value, f"{key}: expected {value}, got {f[key]}"
+    print("  Known-value checks on a hand-written design: OK")
+
 
 if __name__ == "__main__":
     main()

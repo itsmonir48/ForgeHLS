@@ -34,10 +34,14 @@ from config import DATA_DIR, RESULTS_DIR, TARGET_NAMES, COVERAGE_LEVELS, CALIBRA
 
 def compute_ence(y_true, y_pred, uncertainties, n_bins=10):
     """
-    Computes Expected Normalized Calibration Error (ENCE).
-    Bins predictions by uncertainty and measures deviation of RMSE from mean predicted uncertainty.
+    Expected Normalized Calibration Error (Levi et al., 2022).
+
+    Predictions are sorted into equal-count bins by predicted sigma. For each
+    bin, RMSE is compared with the root mean variance RMV = sqrt(mean(sigma^2)):
+    ENCE = mean_b |RMV_b - RMSE_b| / RMV_b.
+    Bins whose RMV is (numerically) zero have an undefined ratio and are
+    skipped rather than counted as perfectly calibrated.
     """
-    # Sort by uncertainty
     order = np.argsort(uncertainties)
     bin_size = len(order) // n_bins
     bin_errors = []
@@ -47,24 +51,29 @@ def compute_ence(y_true, y_pred, uncertainties, n_bins=10):
         end = (b + 1) * bin_size if b < n_bins - 1 else len(order)
         idx = order[start:end]
 
-        bin_true = y_true[idx]
-        bin_pred = y_pred[idx]
-        bin_uncert = uncertainties[idx]
+        rmse = np.sqrt(np.mean((y_true[idx] - y_pred[idx]) ** 2))
+        rmv = np.sqrt(np.mean(uncertainties[idx] ** 2))
 
-        rmse = np.sqrt(np.mean((bin_true - bin_pred) ** 2))
-        mean_sigma = np.mean(bin_uncert)
+        if rmv > 1e-6:
+            bin_errors.append(np.abs(rmv - rmse) / rmv)
 
-        if mean_sigma > 1e-6:
-            bin_errors.append(np.abs(rmse - mean_sigma) / mean_sigma)
-        else:
-            bin_errors.append(0.0)
+    return float(np.mean(bin_errors)) if bin_errors else float("nan")
 
-    return float(np.mean(bin_errors))
+
+def accept_order(score, seed=2026):
+    """Lowest score first; ties broken at random.
+
+    ForgeHLS stores the Pareto variants of a kernel early in its row order, and
+    many designs share identical features and hence identical scores, so a
+    stable/index-based tie break would let row order influence the result.
+    """
+    tiebreak = np.random.default_rng(seed).random(len(score))
+    return np.lexsort((tiebreak, score))
 
 
 def compute_aurc(abs_errors, uncertainty, coverages):
     """Compute risk-coverage area after accepting low-uncertainty samples."""
-    order = np.argsort(uncertainty)
+    order = accept_order(uncertainty)
     risks = []
     for coverage in sorted(coverages):
         count = max(1, int(np.ceil(coverage * len(order))))
@@ -105,14 +114,23 @@ def main():
     Y_true = data["Y_test_true"]                      # (39056, 5)
     rf_preds = data["rf_preds"]                        # (39056, 5)
     rf_uncert = data["rf_uncertainty"]                 # (39056, 5)
-    rf_uncert_log = data["rf_uncertainty_log"] if "rf_uncertainty_log" in data else np.log1p(rf_uncert)
-    rf_pi_lower = data["rf_pi_lower"]                  # (39056, 5)
-    rf_pi_upper = data["rf_pi_upper"]                  # (39056, 5)
-    calibration_residuals = data["rf_calibration_residuals"] if "rf_calibration_residuals" in data else np.abs(Y_true - rf_preds)
+    required = [
+        "rf_uncertainty_log", "rf_calibration_residuals",
+        "deep_ensemble_uncertainty_log",
+    ]
+    missing = [key for key in required if key not in data]
+    if missing:
+        # Falling back would calibrate on the test set (leakage) or use an
+        # approximated log-sigma; refuse instead and ask for a fresh run.
+        raise RuntimeError(
+            f"{npz_path} lacks {missing}; rerun train_uncertainty.py."
+        )
+    rf_uncert_log = data["rf_uncertainty_log"]
+    calibration_residuals = data["rf_calibration_residuals"]
 
     deep_preds = data["deep_ensemble_preds"]           # (39056, 5)
     deep_uncert = data["deep_ensemble_uncertainty"]    # (39056, 5)
-    deep_uncert_log = data["deep_ensemble_uncertainty_log"] if "deep_ensemble_uncertainty_log" in data else deep_uncert / (1.0 + deep_preds)
+    deep_uncert_log = data["deep_ensemble_uncertainty_log"]
 
     total_samples = len(Y_true)
     print(f"Loaded {total_samples:,} unseen test samples for 5 targets.")
@@ -126,10 +144,7 @@ def main():
     for t_idx, target_name in enumerate(TARGET_NAMES):
         y_t = Y_true[:, t_idx]
         pred_rf = rf_preds[:, t_idx]
-        uncert_rf = rf_uncert[:, t_idx]
         uncert_rf_log = rf_uncert_log[:, t_idx]
-        low_rf = rf_pi_lower[:, t_idx]
-        high_rf = rf_pi_upper[:, t_idx]
 
         calibration_coverages = {}
         for nominal in CALIBRATION_LEVELS:
@@ -148,7 +163,6 @@ def main():
 
         # Deep Ensemble ENCE
         pred_deep = deep_preds[:, t_idx]
-        uncert_deep = deep_uncert[:, t_idx]
         uncert_deep_log = deep_uncert_log[:, t_idx]
         ence_deep = compute_ence(np.log1p(y_t), np.log1p(pred_deep), uncert_deep_log)
 
@@ -160,9 +174,9 @@ def main():
             "Tree_MPIW": round(float(mpiw_rf), 2),
             "Tree_Normalized_MPIW": round(float(norm_mpiw_rf), 4),
             "Tree_ENCE": round(float(ence_rf), 4),
-                "Deep_Ensemble_ENCE": round(float(ence_deep), 4),
-                **{f"Coverage_{int(level * 100)}": round(value, 4)
-                    for level, value in calibration_coverages.items()}
+            "Deep_Ensemble_ENCE": round(float(ence_deep), 4),
+            **{f"Coverage_{int(level * 100)}": round(value, 4)
+               for level, value in calibration_coverages.items()}
         })
 
     df_calib = pd.DataFrame(calib_records)
@@ -190,7 +204,7 @@ def main():
 
             abs_errors = np.abs(y_t - pred_t)
             # Sort indices by uncertainty ascending (lowest uncertainty accepted first)
-            sorted_indices = np.argsort(uncert_t)
+            sorted_indices = accept_order(uncert_t)
 
             baseline_mae = float(np.mean(abs_errors))
             aurc = compute_aurc(abs_errors, uncert_t, COVERAGE_LEVELS)

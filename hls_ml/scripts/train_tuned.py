@@ -1,9 +1,14 @@
 """
 Validation-only tuning and zero-aware resource baselines.
 
-The E2 test groups are never used for model selection. Hyperparameters are
-selected on a grouped validation split carved out of the E2 training groups,
-then refit on all E2 training groups before evaluation.
+Test groups are never used for model selection. For every split (E2 and each
+E3 seed) hyperparameters are selected on a grouped validation split carved
+out of *that split's own* training groups, then refit on all of its training
+groups before evaluation. Selecting once on E2 and reusing the choice for the
+other seeds would let E2 training groups that are test groups of another seed
+influence selection, so selection is repeated per seed.
+
+Seed-to-seed standard deviations use ddof=0, matching train_baselines.py.
 """
 
 from itertools import product
@@ -23,7 +28,7 @@ from sklearn.metrics import (
 from sklearn.model_selection import GroupShuffleSplit
 from sklearn.tree import DecisionTreeClassifier
 
-from config import DATA_DIR, RESULTS_DIR, TARGET_NAMES
+from config import DATA_DIR, RESULTS_DIR, TARGET_NAMES, SEEDS
 
 
 def metrics(y_true, prediction):
@@ -193,13 +198,31 @@ def main():
         RESULTS_DIR / "tuned_model_selection.csv", index=False
     )
     repeated_records = []
-    for seed in [42, 43, 44, 45, 46]:
+    for seed in SEEDS:
         train_idx = splits[f"e3_grouped_seed_{seed}_train_idx"]
         test_idx = splits[f"e3_grouped_seed_{seed}_test_idx"]
+        seed_fit_local, seed_val_local = next(
+            GroupShuffleSplit(
+                n_splits=1, test_size=0.20, random_state=2026
+            ).split(train_idx, groups=groups[train_idx])
+        )
+        seed_fit_idx = train_idx[seed_fit_local]
+        seed_val_idx = train_idx[seed_val_local]
         for target_index, target_name in enumerate(TARGET_NAMES):
             y_target = y[:, target_index]
             for model_name in ("RandomForest", "GradientBoosting"):
-                params = selected_params_by_target[(target_name, model_name)]
+                if seed == 42:
+                    # E3 seed 42 is the E2 split; reuse its selection.
+                    params = selected_params_by_target[(target_name, model_name)]
+                else:
+                    _, params = select_params(
+                        model_name,
+                        x[seed_fit_idx],
+                        y_target[seed_fit_idx],
+                        x[seed_val_idx],
+                        y_target[seed_val_idx],
+                    )
+                print(f"  seed {seed} {target_name} {model_name}: {params}", flush=True)
                 model = fit_log_model(
                     make_model(model_name, params),
                     x[train_idx],
@@ -211,19 +234,24 @@ def main():
                     "Seed": seed,
                     "Model": f"Tuned{model_name}",
                     "Target": target_name,
+                    "Params": repr(params),
                     **result,
                 })
 
     repeated = pd.DataFrame(repeated_records)
+
+    def pop_std(values):
+        return float(np.std(values, ddof=0))
+
     repeated_summary = repeated.groupby(
         ["Model", "Target"], as_index=False
     ).agg(
         R2_mean=("R2", "mean"),
-        R2_std=("R2", "std"),
+        R2_std=("R2", pop_std),
         MAE_mean=("MAE", "mean"),
-        MAE_std=("MAE", "std"),
+        MAE_std=("MAE", pop_std),
         LogMAE_mean=("LogMAE", "mean"),
-        LogMAE_std=("LogMAE", "std"),
+        LogMAE_std=("LogMAE", pop_std),
     )
     repeated.to_csv(RESULTS_DIR / "tuned_results_e3_by_seed.csv", index=False)
     repeated_summary.to_csv(

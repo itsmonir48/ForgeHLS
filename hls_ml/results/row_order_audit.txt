@@ -1,0 +1,5 @@
+Row-order audit of the ForgeHLS release
+============================================================
+Kernels with >= 30 variants: 460
+Mean relative row position of Pareto variants within their kernel: 0.283 (0.5 expected if order were random)
+Share of Pareto variants that are the first row with their max unroll factor: 0.371 (all variants: 0.025)

@@ -1,17 +1,19 @@
-#!/usr/bin/env python3
 """
-make_paper_figures.py -- the four figures used in the paper (no in-figure titles; captions live in the paper).
+make_paper_figures.py
 
-Needs: results/extra/robustness_raw.csv and results/extra/quintile data (run extra_analysis.py first),
-       results/uncertainty_predictions.npz, results/feature_ablation_results.csv, data/*.npz
-Writes: figures/paper_fig1.png ... paper_fig4.png   (sizes match IEEE single / double column widths)
+Regenerates the four figures used in the paper from result files:
+  Fig. 1  GB LogMAE, E1 random rows vs E3 kernel-disjoint (5 seeds) with the
+          constant predictor            <- results/extra_e1_e3_summary.csv
+  Fig. 2  mean log-scale error per tree-uncertainty quintile (E2 test)
+                                        <- results/extra_uncertainty_quintiles.csv
+  Fig. 3  risk-coverage curves for latency and LUT
+                                        <- results/extra_risk_coverage_curves.csv
+  Fig. 4  uncertainty-error rho (log sigma) per feature set, mean over the
+          five E3 seeds with std error bars
+                                        <- results/feature_ablation_e3_summary.csv
 
-  Fig 1  GB LogMAE: random rows (E1) vs kernel-disjoint (E3) vs constant predictor, five seeds
-  Fig 2  mean log-scale error across tree-uncertainty quintiles, five targets (E2 test set)
-  Fig 3  risk-coverage curves for latency and LUT (tree log-sigma, tree raw-sigma, |y_hat|, deep log-sigma, random)
-  Fig 4  uncertainty-error Spearman rho for feature sets A/B/C
+Run extra_analysis.py and ablation_study.py first. Output: hls_ml/figures/paper_fig*.png
 """
-from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
@@ -19,94 +21,108 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-ROOT = Path(__file__).resolve().parents[1]
-RES, EXTRA, FIG, DATA = ROOT / "results", ROOT / "results" / "extra", ROOT / "figures", ROOT / "data"
-FIG.mkdir(exist_ok=True)
+from config import RESULTS_DIR, FIGURES_DIR, TARGET_NAMES
 
-plt.rcParams.update({"font.family": "serif", "font.serif": ["DejaVu Serif"], "font.size": 7,
-                     "axes.labelsize": 7, "axes.titlesize": 7, "xtick.labelsize": 6.5, "ytick.labelsize": 6.5,
-                     "legend.fontsize": 6, "axes.linewidth": 0.6, "lines.linewidth": 1.2,
-                     "savefig.dpi": 300, "axes.spines.top": False, "axes.spines.right": False})
-T = ["Latency", "LUT", "DSP", "FF", "BRAM"]
-C_E1, C_E3, C_K = "#2b5c8f", "#d95f02", "#9a9a9a"
+DISPLAY = ["Latency", "LUT", "DSP", "FF", "BRAM"]
+BLUE, ORANGE, GREY, GREEN, LIGHT, PURPLE = "#2b5c8f", "#d95f02", "#9a9a9a", "#4a8c6a", "#b8d8a8", "#8e44ad"
+
+plt.rcParams.update({
+    "font.family": "serif",
+    "font.size": 10,
+    "axes.spines.top": False,
+    "axes.spines.right": False,
+    "axes.grid": True,
+    "axes.grid.axis": "y",
+    "grid.color": "#d0d0d0",
+    "grid.linewidth": 0.6,
+    "axes.axisbelow": True,
+    "savefig.dpi": 300,
+    "savefig.bbox": "tight",
+})
 
 
 def fig1():
-    raw = pd.read_csv(EXTRA / "robustness_raw.csv")
-    a = raw[raw.exp.str.startswith("A")]; b = raw[raw.exp.str.startswith("B")]
-    m = lambda d, c: [d[d.target == t][c].mean() for t in T]
-    s = lambda d, c: [d[d.target == t][c].std() for t in T]
-    x, w = np.arange(5), 0.26
-    fig, ax = plt.subplots(figsize=(3.44, 1.98))
-    ax.bar(x - w, m(a, "LogMAE"), w, yerr=s(a, "LogMAE"), color=C_E1, label="E1 random rows", capsize=1.5, error_kw={"lw": .6})
-    ax.bar(x, m(b, "LogMAE"), w, yerr=s(b, "LogMAE"), color=C_E3, label="E3 kernel-disjoint", capsize=1.5, error_kw={"lw": .6})
-    ax.bar(x + w, m(b, "const_LogMAE"), w, color=C_K, label="Constant (E3)")
-    ax.set_xticks(x); ax.set_xticklabels(T); ax.set_ylabel("LogMAE (lower is better)")
-    ax.legend(frameon=False, loc="upper right"); ax.grid(axis="y", lw=.3, alpha=.6); ax.set_axisbelow(True)
-    fig.tight_layout(pad=0.4); fig.savefig(FIG / "paper_fig1.png"); plt.close(fig)
-
-
-def load_unc():
-    d = np.load(RES / "uncertainty_predictions.npz")
-    return d, d["Y_test_true"]
+    df = pd.read_csv(RESULTS_DIR / "extra_e1_e3_summary.csv").set_index("Target").loc[TARGET_NAMES]
+    x = np.arange(len(TARGET_NAMES))
+    w = 0.26
+    fig, ax = plt.subplots(figsize=(3.5, 2.1))
+    ax.bar(x - w, df["E1_LogMAE_mean"], w, yerr=df["E1_LogMAE_std"], capsize=2, color=BLUE, label="E1 random rows")
+    ax.bar(x, df["E3_LogMAE_mean"], w, yerr=df["E3_LogMAE_std"], capsize=2, color=ORANGE, label="E3 kernel-disjoint")
+    ax.bar(x + w, df["E3_Const_LogMAE_mean"], w, color=GREY, label="Constant (E3)")
+    ax.set_xticks(x, DISPLAY)
+    ax.set_ylabel("LogMAE (lower is better)")
+    ax.legend(frameon=False, fontsize=7)
+    fig.savefig(FIGURES_DIR / "paper_fig1_e1_vs_e3_logmae.png")
+    plt.close(fig)
 
 
 def fig2():
-    d, Y = load_unc()
-    fig, axs = plt.subplots(1, 5, figsize=(7.08, 2.01))
-    for j, (t, ax) in enumerate(zip(T, axs)):
-        lerr = np.abs(np.log1p(Y[:, j]) - np.log1p(d["rf_preds"][:, j]))
-        q = pd.qcut(d["rf_uncertainty"][:, j], 5, labels=False, duplicates="drop")
-        means = [lerr[q == k].mean() for k in range(int(q.max()) + 1)]
-        ax.bar(range(len(means)), means, color="#4c8c6b", width=.7)
-        ax.set_xticks(range(len(means))); ax.set_xticklabels([f"Q{k+1}" for k in range(len(means))])
-        ax.set_title(t); ax.grid(axis="y", lw=.3, alpha=.6); ax.set_axisbelow(True)
-        if j == 0:
-            ax.set_ylabel("Mean log-scale error")
-    fig.tight_layout(pad=0.4); fig.savefig(FIG / "paper_fig2.png"); plt.close(fig)
-
-
-def risk_curve(err, score, covs):
-    o = np.argsort(score, kind="stable"); n = len(err)
-    return np.array([err[o[:max(1, int(np.ceil(c * n)))]].mean() for c in covs])
+    df = pd.read_csv(RESULTS_DIR / "extra_uncertainty_quintiles.csv")
+    fig, axes = plt.subplots(1, 5, figsize=(7.16, 1.9))
+    for ax, name, disp in zip(axes, TARGET_NAMES, DISPLAY):
+        sub = df[df["Target"] == name].sort_values("Quintile_Bin")
+        labels = [f"Q{i + 1}" for i in range(len(sub))]
+        ax.bar(labels, sub["Mean_Log_Error"], color=GREEN, width=0.7)
+        ax.set_title(disp, fontsize=9)
+        ax.tick_params(axis="x", labelsize=7)
+        ax.tick_params(axis="y", labelsize=7)
+    axes[0].set_ylabel("Mean log-scale error")
+    fig.tight_layout(w_pad=0.6)
+    fig.savefig(FIGURES_DIR / "paper_fig2_uncertainty_quintiles.png")
+    plt.close(fig)
 
 
 def fig3():
-    d, Y = load_unc()
-    covs = np.linspace(0.05, 1.0, 20)
-    fig, axs = plt.subplots(1, 2, figsize=(6.25, 2.66), sharey=True)
-    for ax, j in zip(axs, [0, 1]):
-        err = np.abs(Y[:, j] - d["rf_preds"][:, j]); full = err.mean()
-        lines = [("Tree log σ", d["rf_uncertainty_log"][:, j], "-", "#2b5c8f"),
-                 ("Tree raw σ", d["rf_uncertainty"][:, j], "-", "#4c8c6b"),
-                 ("Predicted |ŷ|", d["rf_preds"][:, j], "--", "#d95f02"),
-                 ("Deep log σ", d["deep_ensemble_uncertainty_log"][:, j], "-", "#8e44ad")]
-        for lab, sc, ls, col in lines:
-            ax.plot(covs * 100, np.maximum(risk_curve(err, sc, covs) / full, 1e-5), ls, color=col, label=lab)
-        ax.plot(covs * 100, np.ones_like(covs), ":", color="k", label="Random rejection")
-        ax.set_title(T[j]); ax.set_xlabel("Coverage (% accepted designs)"); ax.grid(lw=.3, alpha=.6)
-        ax.set_yscale("log"); ax.set_ylim(1e-5, 10)
-    axs[0].set_ylabel("Retained MAE / MAE at 100% coverage")
-    h, l = axs[0].get_legend_handles_labels()
-    fig.legend(h, l, loc="upper center", ncol=5, frameon=False, bbox_to_anchor=(0.5, 1.0))
-    fig.tight_layout(pad=0.4, rect=(0, 0, 1, 0.92)); fig.savefig(FIG / "paper_fig3.png"); plt.close(fig)
+    df = pd.read_csv(RESULTS_DIR / "extra_risk_coverage_curves.csv")
+    styles = {
+        "Tree_log_sigma": ("Tree log σ", BLUE, "-"),
+        "Tree_raw_sigma": ("Tree raw σ", GREEN, "-"),
+        "Magnitude": ("Predicted |ŷ|", ORANGE, "--"),
+        "Deep_log_sigma": ("Deep log σ", PURPLE, "-"),
+    }
+    fig, axes = plt.subplots(1, 2, figsize=(7.16, 2.4), sharey=True)
+    for ax, name, disp in zip(axes, ["Worst-caseLatency", "LUT"], ["Latency", "LUT"]):
+        for method, (label, color, ls) in styles.items():
+            sub = df[(df["Target"] == name) & (df["Method"] == method)].sort_values("Coverage")
+            ax.plot(sub["Coverage"] * 100, np.clip(sub["Retained_MAE_Ratio"], 1e-5, None),
+                    color=color, ls=ls, lw=1.4, label=label)
+        ax.axhline(1.0, color="black", ls=":", lw=1.2, label="Random rejection")
+        ax.set_yscale("log")
+        ax.set_title(disp, fontsize=10)
+        ax.set_xlabel("Coverage (% accepted designs)")
+        ax.grid(True, which="major", axis="both")
+    axes[0].set_ylabel("Retained MAE / MAE at 100%")
+    handles, labels = axes[0].get_legend_handles_labels()
+    fig.legend(handles, labels, loc="upper center", ncol=5, frameon=False, fontsize=8, bbox_to_anchor=(0.5, 1.08))
+    fig.savefig(FIGURES_DIR / "paper_fig3_risk_coverage.png")
+    plt.close(fig)
 
 
 def fig4():
-    f = pd.read_csv(RES / "feature_ablation_results.csv")
-    sets = [("Set_A_Basic", "Set A (3)", "#b7d7a8"), ("Set_B_PragmaAware", "Set B (28)", "#4c8c6b"),
-            ("Set_C_StructuralPragma", "Set C (42)", "#2b5c8f")]
-    x, w = np.arange(5), 0.26
-    fig, ax = plt.subplots(figsize=(3.44, 1.82))
-    for k, (key, lab, col) in enumerate(sets):
-        v = f[f.Feature_Set == key]["Spearman_rho"].values
-        ax.bar(x + (k - 1) * w, v, w, color=col, label=lab)
-    ax.set_xticks(x); ax.set_xticklabels(T); ax.set_ylabel("Uncertainty–error ρ (log σ)")
-    ax.set_ylim(0, 1.05); ax.legend(frameon=False, ncol=3, loc="upper left"); ax.grid(axis="y", lw=.3, alpha=.6)
-    ax.set_axisbelow(True)
-    fig.tight_layout(pad=0.4); fig.savefig(FIG / "paper_fig4.png"); plt.close(fig)
+    df = pd.read_csv(RESULTS_DIR / "feature_ablation_e3_summary.csv")
+    sets = [("Set_A_Basic", "Set A (3)", LIGHT), ("Set_B_PragmaAware", "Set B (28)", GREEN),
+            ("Set_C_StructuralPragma", "Set C (42)", BLUE)]
+    x = np.arange(len(TARGET_NAMES))
+    w = 0.26
+    fig, ax = plt.subplots(figsize=(3.5, 2.0))
+    for k, (key, label, color) in enumerate(sets):
+        sub = df[df["Feature_Set"] == key].set_index("Target").loc[TARGET_NAMES]
+        ax.bar(x + (k - 1) * w, sub["Spearman_rho_mean"], w, yerr=sub["Spearman_rho_std"],
+               capsize=2, color=color, label=label)
+    ax.set_xticks(x, DISPLAY)
+    ax.set_ylim(0, 1.05)
+    ax.set_ylabel("Uncertainty–error ρ (log σ)")
+    ax.legend(frameon=False, ncol=3, fontsize=7, loc="upper left")
+    fig.savefig(FIGURES_DIR / "paper_fig4_feature_ablation.png")
+    plt.close(fig)
+
+
+def main():
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    for make in (fig1, fig2, fig3, fig4):
+        make()
+        print(f"{make.__name__} written")
 
 
 if __name__ == "__main__":
-    fig1(); fig2(); fig3(); fig4()
-    print("figures written to", FIG)
+    main()

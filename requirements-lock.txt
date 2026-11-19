@@ -1,0 +1,14 @@
+# Exact versions that produced the results in hls_ml/results and the paper.
+# Python 3.14.10, CPU only. Tree models, HistGradientBoosting and the MLP
+# ensemble give slightly different numbers under other versions.
+# Install with:
+#   pip install -r requirements-lock.txt --extra-index-url https://download.pytorch.org/whl/cpu
+joblib==1.6.0
+matplotlib==3.11.2
+numpy==2.5.3
+pandas==2.3.3
+pyarrow==22.0.0
+scikit-learn==1.9.1
+scipy==1.18.1
+threadpoolctl==3.7.0
+torch==2.15.0
